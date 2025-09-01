@@ -6,7 +6,7 @@ export interface HealthCheckResult {
 
 export async function checkBackendHealth(): Promise<HealthCheckResult> {
 	try {
-		const response = await fetch('http://localhost:5000/health');
+		const response = await fetch('/health');
 		
 		if (response.ok) {
 			try {

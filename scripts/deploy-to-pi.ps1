@@ -6,8 +6,8 @@ param(
 )
 
 $PI_USER = "thezet"
-$PROJECT_DIR = "/home/thezet/piano-led-visualizer"
-$REPO_URL = "https://github.com/your-username/piano-led-visualizer.git"  # Update this
+$PROJECT_DIR = "/home/thezet/Secret-Project"
+$REPO_URL = "https://github.com/agwosdz/Secret-Project.git"  # Update this
 
 Write-Host "🚀 Deploying Piano LED Visualizer to Raspberry Pi at $PiIP" -ForegroundColor Green
 

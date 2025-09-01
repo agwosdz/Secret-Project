@@ -29,7 +29,7 @@ describe('Health Service', () => {
 
 		const result = await checkBackendHealth();
 
-		expect(mockFetch).toHaveBeenCalledWith('http://localhost:5000/health');
+		expect(mockFetch).toHaveBeenCalledWith('/health');
 		expect(result).toEqual({
 			status: 'healthy',
 			message: 'Piano LED Visualizer Backend is running',
