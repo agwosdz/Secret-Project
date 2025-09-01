@@ -1,0 +1,44 @@
+{
+  "name": "piano-led-visualizer",
+  "version": "1.0.0",
+  "description": "Piano LED Visualizer - A full-stack application for visualizing MIDI files on LED strips",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && python app.py",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "npm run build:frontend",
+    "build:frontend": "cd frontend && npm run build",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd backend && python -m pytest",
+    "test:frontend": "cd frontend && npm run test",
+    "install:all": "npm install && cd backend && pip install -r requirements.txt",
+    "health-check": "curl -f http://localhost:5000/health || exit 1"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "."
+  },
+  "keywords": [
+    "piano",
+    "led",
+    "visualizer",
+    "midi",
+    "raspberry-pi",
+    "flask",
+    "sveltekit"
+  ],
+  "author": "Piano LED Visualizer Team",
+  "license": "MIT"
+}
