@@ -7,7 +7,7 @@ param(
 
 $PI_USER = "thezet"
 $PROJECT_DIR = "/home/thezet/Secret-Project"
-$REPO_URL = "https://github.com/agwosdz/Secret-Project.git"  # Update this
+$REPO_URL = "https://github.com/agwosdz/Secret-Project.git"
 
 Write-Host "🚀 Deploying Piano LED Visualizer to Raspberry Pi at $PiIP" -ForegroundColor Green
 
@@ -76,7 +76,7 @@ WantedBy=multi-user.target
 "@
     Invoke-PiCommand "sudo tee /etc/systemd/system/piano-led-visualizer.service > /dev/null << 'EOF'`n$serviceConfig`nEOF"
 
-    Write-Host "🌐 Step 8: Configuring nginx..." -ForegroundColor Yellow
+    Write-Host "🌐 Step 8: Configuring nginx..." -ForegoundColor Yellow
     $nginxConfig = @"
 server {
     listen 80;
@@ -88,7 +88,7 @@ server {
     }
     
     location /api/ {
-        proxy_pass http://localhost:5000/;
+        proxy_pass http://localhost:5000;
         proxy_set_header Host `$host;
         proxy_set_header X-Real-IP `$remote_addr;
     }
@@ -97,6 +97,17 @@ server {
         proxy_pass http://localhost:5000/health;
         proxy_set_header Host `$host;
         proxy_set_header X-Real-IP `$remote_addr;
+    }
+    
+    location /socket.io/ {
+        proxy_pass http://localhost:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade `$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host `$host;
+        proxy_set_header X-Real-IP `$remote_addr;
+        proxy_set_header X-Forwarded-For `$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto `$scheme;
     }
 }
 "@
@@ -119,7 +130,7 @@ server {
         Write-Host "✅ Backend health check: PASSED" -ForegroundColor Green
     }
     catch {
-        Write-Host "❌ Backend health check: FAILED" -ForegroundColor Red
+        Write-Host "❌ Backend health check: FAILED" -ForegroundColor Redsudo 
         Write-Host "Check logs with: ssh $PI_USER@$PiIP 'sudo journalctl -u piano-led-visualizer.service -f'" -ForegroundColor Yellow
     }
 

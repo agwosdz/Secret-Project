@@ -238,16 +238,48 @@ class PlaybackService:
         notes = []
         
         try:
-            # Extract notes from parsed data
-            # Assuming parsed_data has structure: {'notes': [{'time': float, 'note': int, 'velocity': int, 'duration': float, 'channel': int}]}
-            if 'notes' in parsed_data:
-                for note_data in parsed_data['notes']:
+            # Extract events from parsed data
+            # The MIDI parser returns structure: {'events': [{'time': int, 'note': int, 'velocity': int, 'type': str, 'led_index': int}]}
+            if 'events' in parsed_data:
+                # Group note_on and note_off events to calculate durations
+                active_notes = {}  # note -> (start_time, velocity)
+                
+                for event_data in parsed_data['events']:
+                    note_num = event_data.get('note', 60)
+                    time_ms = event_data.get('time', 0)
+                    time_sec = time_ms / 1000.0  # Convert milliseconds to seconds
+                    velocity = event_data.get('velocity', 80)
+                    event_type = event_data.get('type', 'on')
+                    
+                    if event_type == 'on' and velocity > 0:
+                        # Note starts
+                        active_notes[note_num] = (time_sec, velocity)
+                    elif event_type == 'off' or (event_type == 'on' and velocity == 0):
+                        # Note ends
+                        if note_num in active_notes:
+                            start_time, note_velocity = active_notes[note_num]
+                            duration = max(0.1, time_sec - start_time)  # Minimum duration of 0.1s
+                            
+                            notes.append(NoteEvent(
+                                time=start_time,
+                                note=note_num,
+                                velocity=note_velocity,
+                                duration=duration,
+                                channel=0
+                            ))
+                            
+                            del active_notes[note_num]
+                
+                # Handle any remaining active notes (notes that never got a note_off)
+                max_time = max([event['time'] / 1000.0 for event in parsed_data['events']], default=0)
+                for note_num, (start_time, velocity) in active_notes.items():
+                    duration = max(0.5, max_time - start_time)  # Default duration
                     notes.append(NoteEvent(
-                        time=note_data.get('time', 0.0),
-                        note=note_data.get('note', 60),
-                        velocity=note_data.get('velocity', 80),
-                        duration=note_data.get('duration', 0.5),
-                        channel=note_data.get('channel', 0)
+                        time=start_time,
+                        note=note_num,
+                        velocity=velocity,
+                        duration=duration,
+                        channel=0
                     ))
             
             self.logger.info(f"Converted {len(notes)} notes from parsed MIDI data")
