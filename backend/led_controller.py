@@ -1,22 +1,19 @@
 import logging
-import os
 from typing import Optional
 
-# Use pigpio for more reliable GPIO access
-os.environ['GPIOZERO_PIN_FACTORY'] = 'pigpio'
-
 try:
-    import pigpio
-    import time
+    import board
+    import neopixel
     HARDWARE_AVAILABLE = True
-    logging.info("Pigpio library loaded successfully")
+    logging.info("NeoPixel library loaded successfully")
 except ImportError as e:
-    logging.warning(f"Pigpio library not available: {e}")
+    logging.warning(f"NeoPixel library not available: {e}")
     HARDWARE_AVAILABLE = False
-    pigpio = None
+    board = None
+    neopixel = None
 
 class LEDController:
-    """Controller for WS2812B LED strip using pigpio library."""
+    """Controller for WS2812B LED strip using Adafruit NeoPixel library."""
     
     def __init__(self, pin=18, num_pixels=30, brightness=0.3):
         """
@@ -34,30 +31,38 @@ class LEDController:
             self.pin = pin
             self.num_pixels = num_pixels
             self.brightness = brightness
-            self.pi = None
+            self.pixels = None
             self._led_state = [(0, 0, 0)] * num_pixels  # Track LED state for simulation
-            self._pending_updates = False
             return
             
         self.pin = pin
         self.num_pixels = num_pixels
         self.brightness = brightness
-        self.pi = None
         self._led_state = [(0, 0, 0)] * num_pixels  # Track current LED state
-        self._pending_updates = False  # Track if updates are pending
         
         try:
-            self.pi = pigpio.pi()
-            if not self.pi.connected:
-                raise RuntimeError("Could not connect to pigpio daemon")
+            # Get the appropriate pin object
+            if pin == 18:
+                board_pin = board.D18
+            elif pin == 12:
+                board_pin = board.D12
+            elif pin == 21:
+                board_pin = board.D21
+            else:
+                raise ValueError(f"Unsupported pin {pin}. Use 18, 12, or 21.")
             
-            # Initialize WS2812B strip using pigpio's wave functionality
-            self.pi.set_mode(self.pin, pigpio.OUTPUT)
-            self.logger.info(f"LED controller initialized with {num_pixels} pixels on pin {pin} using pigpio")
+            # Initialize NeoPixel strip
+            self.pixels = neopixel.NeoPixel(
+                board_pin, 
+                num_pixels, 
+                brightness=brightness, 
+                auto_write=False,
+                pixel_order=neopixel.GRB
+            )
+            
+            self.logger.info(f"LED controller initialized with {num_pixels} pixels on pin {pin} using NeoPixel")
         except Exception as e:
             self.logger.error(f"Failed to initialize LED controller: {e}")
-            if self.pi:
-                self.pi.stop()
             raise
     
     def turn_on_led(self, index: int, color: tuple = (255, 255, 255), auto_show: bool = True) -> bool:
@@ -86,10 +91,11 @@ class LEDController:
                 self.logger.debug(f"[SIMULATION] LED {index} set to color {color}")
                 return True
                 
-            if not self.pi or not self.pi.connected:
+            if not self.pixels:
                 raise RuntimeError("LED controller not initialized")
             
-            self._pending_updates = True
+            # Set the pixel color
+            self.pixels[index] = color
             
             if auto_show:
                 self.show()
@@ -124,12 +130,11 @@ class LEDController:
             if not HARDWARE_AVAILABLE:
                 return True
                 
-            if not self.pi or not self.pi.connected:
+            if not self.pixels:
                 raise RuntimeError("LED controller not initialized")
             
-            if self._pending_updates:
-                self._send_ws2812b_data()
-                self._pending_updates = False
+            # Update the LED strip
+            self.pixels.show()
                 
             return True
             
@@ -137,53 +142,7 @@ class LEDController:
             self.logger.error(f"Failed to update LED strip: {e}")
             return False
     
-    def _send_ws2812b_data(self):
-        """Send WS2812B data using pigpio waves."""
-        if not self.pi or not self.pi.connected:
-            return
-            
-        # WS2812B timing (in microseconds)
-        # 0 bit: 0.4us high, 0.85us low
-        # 1 bit: 0.8us high, 0.45us low
-        # Reset: >50us low
-        
-        waves = []
-        
-        for i in range(self.num_pixels):
-            color = self._led_state[i]
-            # Apply brightness
-            r, g, b = [int(c * self.brightness) for c in color]
-            
-            # WS2812B expects GRB order
-            for byte_val in [g, r, b]:
-                for bit in range(7, -1, -1):
-                    if (byte_val >> bit) & 1:
-                        # Send '1' bit: 0.8us high, 0.45us low
-                        waves.extend([
-                            pigpio.pulse(1 << self.pin, 0, 800),   # 0.8us high
-                            pigpio.pulse(0, 1 << self.pin, 450)    # 0.45us low
-                        ])
-                    else:
-                        # Send '0' bit: 0.4us high, 0.85us low
-                        waves.extend([
-                            pigpio.pulse(1 << self.pin, 0, 400),   # 0.4us high
-                            pigpio.pulse(0, 1 << self.pin, 850)    # 0.85us low
-                        ])
-        
-        # Add reset pulse (>50us low)
-        waves.append(pigpio.pulse(0, 1 << self.pin, 60000))  # 60us low
-        
-        # Clear any existing waves and add new ones
-        self.pi.wave_clear()
-        self.pi.wave_add_generic(waves)
-        wave_id = self.pi.wave_create()
-        
-        if wave_id >= 0:
-            self.pi.wave_send_once(wave_id)
-            # Wait for transmission to complete
-            while self.pi.wave_tx_busy():
-                time.sleep(0.001)
-            self.pi.wave_delete(wave_id)
+
     
     def turn_off_all(self) -> bool:
         """
@@ -200,10 +159,11 @@ class LEDController:
                 self.logger.debug("[SIMULATION] All LEDs turned off")
                 return True
                 
-            if not self.pi or not self.pi.connected:
+            if not self.pixels:
                 raise RuntimeError("LED controller not initialized")
             
-            self._pending_updates = True
+            # Turn off all pixels
+            self.pixels.fill((0, 0, 0))
             self.show()
             return True
             
@@ -246,15 +206,15 @@ class LEDController:
                 self.logger.info("[SIMULATION] LED controller cleaned up successfully")
                 return
                 
-            if self.pi and self.pi.connected:
+            if self.pixels:
                 # Turn off all LEDs before cleanup
                 self._led_state = [(0, 0, 0)] * self.num_pixels
-                self._pending_updates = True
-                self.show()
+                self.pixels.fill((0, 0, 0))
+                self.pixels.show()
                 
-                # Stop pigpio connection
-                self.pi.stop()
-                self.pi = None
+                # Deinitialize NeoPixel
+                self.pixels.deinit()
+                self.pixels = None
                 self.logger.info("LED controller cleaned up successfully")
         except Exception as e:
             self.logger.error(f"Error during cleanup: {e}")
