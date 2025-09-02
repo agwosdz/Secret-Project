@@ -98,6 +98,17 @@
 		});
 	}
 
+	// Test all LEDs sequentially
+	function testAllLEDs() {
+		if (connectionStatus !== 'connected') return;
+		
+		dispatch('testAll', {
+			color: selectedColor,
+			brightness: selectedBrightness,
+			delay: 100 // 100ms delay between each LED
+		});
+	}
+
 	$: isConnected = connectionStatus === 'connected';
 </script>
 
@@ -276,6 +287,13 @@
 				class="test-button secondary"
 			>
 				Fill All
+			</button>
+			<button 
+				on:click={testAllLEDs}
+				disabled={!isConnected}
+				class="test-button primary"
+			>
+				Test All
 			</button>
 			<button 
 				on:click={clearAllLEDs}

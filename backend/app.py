@@ -173,6 +173,13 @@ def test_led():
                 'error': 'Bad Request',
                 'message': 'LED index must be a valid integer'
             }), 400
+            
+        # Validate LED index range (allow -1 for Clear All)
+        if led_index != -1 and not (0 <= led_index < led_controller.num_pixels):
+            return jsonify({
+                'error': 'Bad Request',
+                'message': f'LED index must be between 0 and {led_controller.num_pixels - 1}, or -1 for all LEDs'
+            }), 400
         
         # Validate state
         if state not in ['on', 'off']:
@@ -181,30 +188,62 @@ def test_led():
                 'message': 'LED state must be "on" or "off"'
             }), 400
         
-        # Control the LED
-        if state == 'on':
-            color = data.get('color', [255, 255, 255])  # Default to white
-            if isinstance(color, list) and len(color) == 3:
-                color = tuple(color)
+        # Control the LED(s)
+        if led_index == -1:
+            # Handle Clear All or Fill All
+            if state == 'on':
+                # Fill All LEDs with color
+                color = data.get('color', [255, 255, 255])  # Default to white
+                if isinstance(color, list) and len(color) == 3:
+                    color = tuple(color)
+                else:
+                    color = (255, 255, 255)
+                
+                # Fill all LEDs
+                for i in range(led_controller.num_pixels):
+                    led_controller.turn_on_led(i, color, auto_show=False)
+                led_controller.show()
+                
+                return jsonify({
+                    'status': 'success',
+                    'message': f'All LEDs filled with color {color}',
+                    'action': 'fill_all',
+                    'color': color
+                }), 200
             else:
-                color = (255, 255, 255)
+                # Clear All LEDs
+                led_controller.turn_off_all()
+                
+                return jsonify({
+                    'status': 'success',
+                    'message': 'All LEDs cleared',
+                    'action': 'clear_all'
+                }), 200
+        else:
+            # Handle individual LED
+            if state == 'on':
+                color = data.get('color', [255, 255, 255])  # Default to white
+                if isinstance(color, list) and len(color) == 3:
+                    color = tuple(color)
+                else:
+                    color = (255, 255, 255)
+                
+                success = led_controller.turn_on_led(led_index, color)
+            else:
+                success = led_controller.turn_off_led(led_index)
             
-            success = led_controller.turn_on_led(led_index, color)
-        else:
-            success = led_controller.turn_off_led(led_index)
-        
-        if success:
-            return jsonify({
-                'status': 'success',
-                'message': f'LED {led_index} turned {state}',
-                'led_index': led_index,
-                'state': state
-            }), 200
-        else:
-            return jsonify({
-                'error': 'Hardware Error',
-                'message': f'Failed to turn LED {led_index} {state}'
-            }), 500
+            if success:
+                return jsonify({
+                    'status': 'success',
+                    'message': f'LED {led_index} turned {state}',
+                    'led_index': led_index,
+                    'state': state
+                }), 200
+            else:
+                return jsonify({
+                    'error': 'Hardware Error',
+                    'message': f'Failed to turn LED {led_index} {state}'
+                }), 500
     
     except Exception as e:
         logger.error(f"Error in test_led endpoint: {e}")
@@ -862,33 +901,64 @@ def handle_test_led(data):
             return
         
         led_index = data.get('index', 0)
-        rgb = data.get('rgb', [255, 255, 255])
-        brightness = data.get('brightness', 100)
+        r = data.get('r', 255)
+        g = data.get('g', 255) 
+        b = data.get('b', 255)
+        brightness = data.get('brightness', 1.0)
         
+        # Handle legacy rgb format
+        if 'rgb' in data:
+            rgb = data['rgb']
+            r, g, b = rgb[0], rgb[1], rgb[2]
+            
+        # Convert brightness to 0-1 range if it's 0-100
+        if brightness > 1.0:
+            brightness = brightness / 100.0
+            
         # Validate inputs
-        if not (0 <= led_index < 150):
+        if led_index != -1 and not (0 <= led_index < 150):
             emit('error', {'message': f'Invalid LED index: {led_index}'})
             return
             
-        if not (0 <= brightness <= 100):
+        if not (0 <= brightness <= 1.0):
             emit('error', {'message': f'Invalid brightness: {brightness}'})
             return
             
         # Apply brightness to RGB values
-        brightness_factor = brightness / 100.0
-        adjusted_rgb = [int(c * brightness_factor) for c in rgb]
+        adjusted_rgb = [int(r * brightness), int(g * brightness), int(b * brightness)]
         
-        # Set the LED
-        led_controller.turn_on_led(led_index, tuple(adjusted_rgb))
-        # show() is called automatically by turn_on_led with auto_show=True
-        
-        logger.info(f"LED {led_index} set to RGB{adjusted_rgb} via WebSocket")
-        emit('led_test_result', {
-            'success': True,
-            'index': led_index,
-            'rgb': adjusted_rgb,
-            'brightness': brightness
-        })
+        # Handle Clear All (index -1) or Fill All
+        if led_index == -1:
+            if r == 0 and g == 0 and b == 0:
+                # Clear all LEDs
+                led_controller.turn_off_all()
+                logger.info("All LEDs cleared via WebSocket")
+                emit('led_test_result', {
+                    'success': True,
+                    'action': 'clear_all',
+                    'rgb': adjusted_rgb
+                })
+            else:
+                # Fill all LEDs with color
+                for i in range(min(150, led_controller.num_pixels)):
+                    led_controller.turn_on_led(i, tuple(adjusted_rgb), auto_show=False)
+                led_controller.show()
+                logger.info(f"All LEDs filled with RGB{adjusted_rgb} via WebSocket")
+                emit('led_test_result', {
+                    'success': True,
+                    'action': 'fill_all',
+                    'rgb': adjusted_rgb
+                })
+        else:
+            # Set individual LED
+            led_controller.turn_on_led(led_index, tuple(adjusted_rgb))
+            logger.info(f"LED {led_index} set to RGB{adjusted_rgb} via WebSocket")
+            emit('led_test_result', {
+                'success': True,
+                'index': led_index,
+                'rgb': adjusted_rgb,
+                'brightness': brightness
+            })
         
     except Exception as e:
         logger.error(f"Error in WebSocket LED test: {e}")

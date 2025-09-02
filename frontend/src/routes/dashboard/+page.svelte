@@ -214,6 +214,36 @@
 		}
 	}
 
+	// Handle test all LEDs functionality
+	function handleTestAll(event) {
+		const { color, brightness, delay } = event.detail;
+		if (websocket && connectionStatus === 'connected') {
+			// Test each LED sequentially with a delay
+			for (let i = 0; i < LED_COUNT; i++) {
+				setTimeout(() => {
+					websocket.emit('test_led', {
+						index: i,
+						r: color.r,
+						g: color.g,
+						b: color.b,
+						brightness: brightness
+					});
+				}, i * delay);
+			}
+			
+			// Clear all LEDs after the test completes
+			setTimeout(() => {
+				websocket.emit('test_led', {
+					index: -1, // Clear all
+					r: 0,
+					g: 0,
+					b: 0,
+					brightness: 0
+				});
+			}, LED_COUNT * delay + 1000); // Wait for all LEDs + 1 second
+		}
+	}
+
 	// Fetch system status from backend
 	async function fetchSystemStatus() {
 		try {
@@ -308,6 +338,7 @@
 				{connectionStatus}
 				on:ledTest={handleLEDTest}
 				on:patternTest={handlePatternTest}
+				on:testAll={handleTestAll}
 			/>
 		</section>
 
