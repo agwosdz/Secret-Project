@@ -73,7 +73,7 @@
 
 param(
     [string]$PiHost = "192.168.1.225",
-    [string]$PiUser = "thezet",
+    [string]$PiUser = "pi",
     [string]$RemotePath = "~/Secret-Project",
     [string]$SinceCommit = "HEAD~1",
     [int]$SinceHours = 0,

@@ -624,6 +624,97 @@ def handle_connect():
             'error_message': status.error_message
         })
 
+@socketio.on('test_led')
+def handle_test_led(data):
+    """Handle LED test via WebSocket"""
+    try:
+        if not led_controller:
+            emit('error', {'message': 'LED controller not available'})
+            return
+        
+        led_index = data.get('index', 0)
+        rgb = data.get('rgb', [255, 255, 255])
+        brightness = data.get('brightness', 100)
+        
+        # Validate inputs
+        if not (0 <= led_index < 150):
+            emit('error', {'message': f'Invalid LED index: {led_index}'})
+            return
+            
+        if not (0 <= brightness <= 100):
+            emit('error', {'message': f'Invalid brightness: {brightness}'})
+            return
+            
+        # Apply brightness to RGB values
+        brightness_factor = brightness / 100.0
+        adjusted_rgb = [int(c * brightness_factor) for c in rgb]
+        
+        # Set the LED
+        led_controller.set_led(led_index, adjusted_rgb)
+        led_controller.show()
+        
+        logger.info(f"LED {led_index} set to RGB{adjusted_rgb} via WebSocket")
+        emit('led_test_result', {
+            'success': True,
+            'index': led_index,
+            'rgb': adjusted_rgb,
+            'brightness': brightness
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in WebSocket LED test: {e}")
+        emit('error', {'message': f'LED test failed: {str(e)}'})
+
+@socketio.on('test_pattern')
+def handle_test_pattern(data):
+    """Handle pattern test via WebSocket"""
+    try:
+        if not led_controller:
+            emit('error', {'message': 'LED controller not available'})
+            return
+            
+        pattern = data.get('pattern', 'rainbow')
+        duration_ms = data.get('duration_ms', 1000)
+        
+        logger.info(f"Testing pattern '{pattern}' for {duration_ms}ms via WebSocket")
+        
+        # Simple pattern implementations
+        if pattern == 'rainbow':
+            # Create rainbow pattern
+            for i in range(150):
+                hue = (i * 360 // 150) % 360
+                rgb = _hue_to_rgb(hue)
+                led_controller.set_led(i, rgb)
+        elif pattern == 'red':
+            led_controller.fill([255, 0, 0])
+        elif pattern == 'green':
+            led_controller.fill([0, 255, 0])
+        elif pattern == 'blue':
+            led_controller.fill([0, 0, 255])
+        elif pattern == 'white':
+            led_controller.fill([255, 255, 255])
+        else:
+            emit('error', {'message': f'Unknown pattern: {pattern}'})
+            return
+            
+        led_controller.show()
+        
+        emit('pattern_test_result', {
+            'success': True,
+            'pattern': pattern,
+            'duration_ms': duration_ms
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in WebSocket pattern test: {e}")
+        emit('error', {'message': f'Pattern test failed: {str(e)}'})
+
+def _hue_to_rgb(hue):
+    """Convert hue (0-360) to RGB values"""
+    import colorsys
+    r, g, b = colorsys.hsv_to_rgb(hue / 360.0, 1.0, 1.0)
+    return [int(r * 255), int(g * 255), int(b * 255)]
+
 @socketio.on('disconnect')
 def handle_disconnect():
     """Handle client disconnection"""

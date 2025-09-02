@@ -6,8 +6,8 @@
 set -e
 
 PI_IP=${1:-"raspberrypi.local"}
-PI_USER="thezet"
-PROJECT_DIR="/home/thezet/Secret-Project"
+PI_USER="pi"
+PROJECT_DIR="/home/pi/Secret-Project"
 REPO_URL="https://github.com/agwosdz/Secret-Project.git"
 
 echo "🚀 Deploying Piano LED Visualizer to Raspberry Pi at $PI_IP"
@@ -30,7 +30,7 @@ run_on_pi "sudo apt install python3 python3-pip python3-venv git nginx -y"
 
 # Install Node.js
 echo "📦 Installing Node.js..."
-run_on_pi "curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - && sudo apt install nodejs -y"
+run_on_pi "curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install nodejs -y"
 
 echo "📁 Step 3: Setting up project directory..."
 run_on_pi "rm -rf $PROJECT_DIR"

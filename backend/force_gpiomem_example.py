@@ -11,7 +11,7 @@ import sys
 
 # Method 1: Set environment variable before importing any GPIO libraries
 # This forces the underlying GPIO library to use /dev/gpiomem
-os.environ['BLINKA_FORCEBOARD'] = 'RASPBERRY_PI_4B'  # or your Pi model
+os.environ['BLINKA_FORCEBOARD'] = 'RASPBERRY_PI_ZERO_2_W'  # or your Pi model
 os.environ['BLINKA_FORCECHIP'] = 'BCM2XXX'  # BCM chip
 os.environ['BLINKA_USE_GPIOMEM'] = '1'  # Force gpiomem usage
 
