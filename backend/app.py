@@ -650,8 +650,8 @@ def handle_test_led(data):
         adjusted_rgb = [int(c * brightness_factor) for c in rgb]
         
         # Set the LED
-        led_controller.set_led(led_index, adjusted_rgb)
-        led_controller.show()
+        led_controller.turn_on_led(led_index, tuple(adjusted_rgb))
+        # show() is called automatically by turn_on_led with auto_show=True
         
         logger.info(f"LED {led_index} set to RGB{adjusted_rgb} via WebSocket")
         emit('led_test_result', {
@@ -681,18 +681,31 @@ def handle_test_pattern(data):
         # Simple pattern implementations
         if pattern == 'rainbow':
             # Create rainbow pattern
-            for i in range(150):
+            for i in range(min(150, led_controller.num_pixels)):
                 hue = (i * 360 // 150) % 360
                 rgb = _hue_to_rgb(hue)
-                led_controller.set_led(i, rgb)
+                led_controller.turn_on_led(i, tuple(rgb), auto_show=False)
+            led_controller.show()
         elif pattern == 'red':
-            led_controller.fill([255, 0, 0])
+            # Fill all LEDs with red
+            for i in range(led_controller.num_pixels):
+                led_controller.turn_on_led(i, (255, 0, 0), auto_show=False)
+            led_controller.show()
         elif pattern == 'green':
-            led_controller.fill([0, 255, 0])
+            # Fill all LEDs with green
+            for i in range(led_controller.num_pixels):
+                led_controller.turn_on_led(i, (0, 255, 0), auto_show=False)
+            led_controller.show()
         elif pattern == 'blue':
-            led_controller.fill([0, 0, 255])
+            # Fill all LEDs with blue
+            for i in range(led_controller.num_pixels):
+                led_controller.turn_on_led(i, (0, 0, 255), auto_show=False)
+            led_controller.show()
         elif pattern == 'white':
-            led_controller.fill([255, 255, 255])
+            # Fill all LEDs with white
+            for i in range(led_controller.num_pixels):
+                led_controller.turn_on_led(i, (255, 255, 255), auto_show=False)
+            led_controller.show()
         else:
             emit('error', {'message': f'Unknown pattern: {pattern}'})
             return
