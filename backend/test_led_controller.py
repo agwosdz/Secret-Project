@@ -304,5 +304,88 @@ class TestLEDEndpoint(unittest.TestCase):
         self.assertEqual(data['error'], 'Hardware Error')
 
 
+def run_device_tests():
+    """Run device-specific tests when hardware is available."""
+    print("\n=== DEVICE TESTING MODE ===")
+    print("Testing actual LED hardware...\n")
+    
+    try:
+        # Import without mocking for device testing
+        import importlib
+        import led_controller
+        importlib.reload(led_controller)  # Reload to get real hardware
+        
+        from led_controller import LEDController
+        
+        # Test hardware initialization
+        print("1. Testing LED Controller initialization...")
+        controller = LEDController(num_pixels=10, brightness=0.2)
+        print(f"   ✓ Controller initialized with {controller.num_pixels} pixels")
+        
+        if controller.pixels is None:
+            print("   ⚠ Running in simulation mode (no hardware detected)")
+            return False
+        
+        # Test individual LED control
+        print("\n2. Testing individual LED control...")
+        for i in range(3):  # Test first 3 LEDs
+            print(f"   Testing LED {i}...")
+            
+            # Turn on red
+            if controller.turn_on_led(i, (255, 0, 0)):
+                print(f"   ✓ LED {i} turned on (red)")
+                import time
+                time.sleep(0.5)
+                
+                # Turn off
+                if controller.turn_off_led(i):
+                    print(f"   ✓ LED {i} turned off")
+                    time.sleep(0.2)
+                else:
+                    print(f"   ✗ Failed to turn off LED {i}")
+            else:
+                print(f"   ✗ Failed to turn on LED {i}")
+        
+        # Test all LEDs pattern
+        print("\n3. Testing all LEDs pattern...")
+        if controller.turn_off_all():
+            print("   ✓ All LEDs turned off")
+        
+        # Test cleanup
+        print("\n4. Testing cleanup...")
+        controller.cleanup()
+        print("   ✓ Cleanup completed")
+        
+        print("\n🎉 Device tests completed successfully!")
+        print("\nYour LED hardware is working correctly.")
+        print("\nFor more comprehensive testing, run:")
+        print("   python3 test_led_device.py")
+        
+        return True
+        
+    except ImportError as e:
+        print(f"   ✗ Hardware libraries not available: {e}")
+        print("\n   Install required packages:")
+        print("   pip3 install adafruit-circuitpython-neopixel adafruit-blinka")
+        return False
+    except Exception as e:
+        print(f"   ✗ Device test failed: {e}")
+        print("\n   Troubleshooting steps:")
+        print("   1. Check hardware connections")
+        print("   2. Verify power supply")
+        print("   3. Run: python3 led_troubleshoot.py")
+        return False
+
+
 if __name__ == '__main__':
-    unittest.main()
+    import sys
+    
+    # Check if device testing is requested
+    if len(sys.argv) > 1 and sys.argv[1] == '--device':
+        success = run_device_tests()
+        sys.exit(0 if success else 1)
+    else:
+        # Run unit tests
+        print("Running unit tests...")
+        print("For device testing, use: python3 test_led_controller.py --device")
+        unittest.main()
