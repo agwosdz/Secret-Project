@@ -16,14 +16,12 @@ from unittest.mock import MagicMock
 import sys
 
 # Create mock modules
-mock_board = MagicMock()
-mock_neopixel = MagicMock()
-mock_adafruit = MagicMock()
+mock_rpi_ws281x = MagicMock()
+mock_rpi_gpio = MagicMock()
 
 # Add to sys.modules
-sys.modules['board'] = mock_board
-sys.modules['neopixel'] = mock_neopixel
-sys.modules['adafruit_circuitpython_neopixel'] = mock_adafruit
+sys.modules['rpi_ws281x'] = mock_rpi_ws281x
+sys.modules['RPi.GPIO'] = mock_rpi_gpio
 
 from app import app
 

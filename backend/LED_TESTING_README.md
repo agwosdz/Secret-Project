@@ -1,6 +1,6 @@
 # LED Hardware Testing Guide
 
-This guide provides comprehensive tools and instructions for testing NeoPixel LED strips on Raspberry Pi.
+This guide provides comprehensive tools and instructions for testing WS281x LED strips on Raspberry Pi using the rpi_ws281x library.
 
 ## Quick Start
 
@@ -35,10 +35,10 @@ sudo python3 led_troubleshoot.py
 
 **What it checks:**
 - System information and permissions
-- Required Python packages
+- Required Python packages (rpi_ws281x, RPi.GPIO)
 - GPIO configuration
 - Hardware connection guidance
-- Basic GPIO and NeoPixel functionality
+- Basic GPIO and rpi_ws281x functionality
 
 **When to use:** First step when LEDs don't work at all
 
@@ -111,7 +111,10 @@ If GPIO18 doesn't work, try these alternatives:
 
 Update your code:
 ```python
-controller = LEDController(pin=board.D12)  # For GPIO12
+# In led_controller.py, change LED_PIN
+LED_PIN = 12  # For GPIO12
+LED_PIN = 13  # For GPIO13
+LED_PIN = 19  # For GPIO19
 ```
 
 ## Software Requirements
@@ -119,13 +122,12 @@ controller = LEDController(pin=board.D12)  # For GPIO12
 ### Required Packages
 
 ```bash
-# Install all required packages
-pip3 install adafruit-circuitpython-neopixel adafruit-blinka rpi-ws281x
+# Install required packages for rpi_ws281x
+pip3 install rpi_ws281x RPi.GPIO
 
 # Or install individually
-pip3 install adafruit-circuitpython-neopixel
-pip3 install adafruit-blinka
-pip3 install rpi-ws281x
+pip3 install rpi_ws281x
+pip3 install RPi.GPIO
 ```
 
 ### System Configuration

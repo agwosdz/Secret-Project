@@ -1,97 +1,101 @@
 #!/usr/bin/env python3
 """
-Example: Force NeoPixel to use /dev/gpiomem instead of /dev/mem
+Example: Using rpi_ws281x with proper GPIO permissions
 
-This script demonstrates how to force the use of /dev/gpiomem for GPIO access,
-which is safer and doesn't require root privileges.
+This script demonstrates how to use rpi_ws281x library for LED control,
+which provides better performance and more reliable GPIO access.
 """
 
 import os
 import sys
 
-# Method 1: Set environment variable before importing any GPIO libraries
-# This forces the underlying GPIO library to use /dev/gpiomem
-os.environ['BLINKA_FORCEBOARD'] = 'RASPBERRY_PI_ZERO_2_W'  # or your Pi model
-os.environ['BLINKA_FORCECHIP'] = 'BCM2XXX'  # BCM chip
-os.environ['BLINKA_USE_GPIOMEM'] = '1'  # Force gpiomem usage
-
-# Alternative environment variables that may help:
-# os.environ['GPIOZERO_PIN_FACTORY'] = 'pigpio'  # Use pigpio instead of RPi.GPIO
-# os.environ['PIGPIO_ADDR'] = 'localhost'  # For remote pigpio
-
-print("Environment variables set to force /dev/gpiomem usage:")
-print(f"BLINKA_FORCEBOARD: {os.environ.get('BLINKA_FORCEBOARD', 'Not set')}")
-print(f"BLINKA_FORCECHIP: {os.environ.get('BLINKA_FORCECHIP', 'Not set')}")
-print(f"BLINKA_USE_GPIOMEM: {os.environ.get('BLINKA_USE_GPIOMEM', 'Not set')}")
+print("Testing rpi_ws281x library for LED control...")
 
 # Now import the hardware libraries
 try:
-    import board
-    import neopixel
+    from rpi_ws281x import PixelStrip, Color
+    import RPi.GPIO as GPIO
     print("✓ Hardware libraries imported successfully")
     
     # Test GPIO access
     print("\nTesting GPIO access...")
     
-    # Create a NeoPixel instance (this will test GPIO access)
-    pixels = neopixel.NeoPixel(board.D18, 10, brightness=0.1, auto_write=False)
-    print("✓ NeoPixel initialized successfully using /dev/gpiomem")
+    # LED strip configuration
+    LED_COUNT = 10        # Number of LED pixels
+    LED_PIN = 18          # GPIO pin connected to the pixels (18 uses PWM!)
+    LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
+    LED_DMA = 10          # DMA channel to use for generating signal (try 10)
+    LED_BRIGHTNESS = 25   # Set to 0 for darkest and 255 for brightest (10% = 25)
+    LED_INVERT = False    # True to invert the signal (when using NPN transistor level shift)
+    LED_CHANNEL = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
+    
+    # Create a PixelStrip instance
+    pixels = PixelStrip(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
+    pixels.begin()
+    print("✓ PixelStrip initialized successfully")
     
     # Test setting a pixel
-    pixels[0] = (255, 0, 0)  # Red
+    pixels.setPixelColor(0, Color(255, 0, 0))  # Red
     pixels.show()
     print("✓ LED control test successful")
     
     # Cleanup
-    pixels.deinit()
+    for i in range(LED_COUNT):
+        pixels.setPixelColor(i, Color(0, 0, 0))
+    pixels.show()
     print("✓ Cleanup completed")
     
 except ImportError as e:
     print(f"✗ Failed to import hardware libraries: {e}")
     print("Make sure you're running on a Raspberry Pi with required packages installed")
+    print("Install with: pip3 install rpi_ws281x")
 except Exception as e:
     print(f"✗ Error during GPIO access: {e}")
     print("This might indicate permission issues or hardware problems")
+    print("Try running with sudo or check GPIO permissions")
 
 print("\n" + "="*60)
-print("FORCING /dev/gpiomem USAGE - IMPLEMENTATION OPTIONS")
+print("RPI_WS281X LIBRARY - IMPLEMENTATION OPTIONS")
 print("="*60)
 
 print("""
-1. ENVIRONMENT VARIABLES (Recommended):
-   Set these before importing any GPIO libraries:
+1. INSTALLATION:
+   Install the rpi_ws281x library:
    
-   export BLINKA_USE_GPIOMEM=1
-   export BLINKA_FORCEBOARD=RASPBERRY_PI_4B
-   export BLINKA_FORCECHIP=BCM2XXX
+   pip3 install rpi_ws281x
    
-   Or in Python:
-   os.environ['BLINKA_USE_GPIOMEM'] = '1'
+   This library provides better performance and more reliable
+   GPIO access compared to CircuitPython libraries.
 
-2. MODIFY led_controller.py:
-   Add environment variable setting at the top of the file,
-   before any imports.
-
-3. SYSTEM-LEVEL CONFIGURATION:
-   Ensure /dev/gpiomem has proper permissions:
+2. PERMISSIONS:
+   The rpi_ws281x library typically requires root privileges
+   for direct hardware access:
    
-   sudo chmod 666 /dev/gpiomem
+   sudo python3 your_script.py
+   
+   Or add your user to the gpio group:
    sudo usermod -a -G gpio $USER
 
-4. USE ALTERNATIVE GPIO LIBRARY:
-   Consider using pigpio instead of RPi.GPIO:
-   
-   export GPIOZERO_PIN_FACTORY=pigpio
-   pip3 install pigpio
-   sudo systemctl enable pigpiod
-   sudo systemctl start pigpiod
+3. GPIO PIN CONFIGURATION:
+   Pin 18 (PWM0) is recommended for best performance:
+   - Uses hardware PWM for precise timing
+   - Supports higher LED counts
+   - More stable signal generation
 
-5. VERIFY DEVICE ACCESS:
-   Check which device is being used:
+4. ALTERNATIVE PINS:
+   Other PWM-capable pins can be used:
+   - Pin 12 (PWM0 alt)
+   - Pin 13 (PWM1)
+   - Pin 19 (PWM1 alt)
+
+5. TROUBLESHOOTING:
+   If you encounter permission issues:
    
-   ls -la /dev/gpio*
-   lsof /dev/gpiomem
-   lsof /dev/mem
+   ls -la /dev/gpiomem
+   sudo chmod 666 /dev/gpiomem
+   
+   Check if PWM is available:
+   ls -la /sys/class/pwm/
 """)
 
 print("\n" + "="*60)
@@ -99,24 +103,37 @@ print("IMPLEMENTATION IN YOUR PROJECT")
 print("="*60)
 
 print("""
-To force /dev/gpiomem in your LED controller:
+To implement rpi_ws281x in your LED controller:
 
-1. Modify led_controller.py to set environment variables:
-   
-   import os
-   # Force gpiomem usage BEFORE importing board/neopixel
-   os.environ['BLINKA_USE_GPIOMEM'] = '1'
-   os.environ['BLINKA_FORCEBOARD'] = 'RASPBERRY_PI_4B'
-   
-   import board
-   import neopixel
+1. Update led_controller.py imports:
 
-2. Or set environment variables when running your application:
-   
-   BLINKA_USE_GPIOMEM=1 python3 start.py
+   from rpi_ws281x import PixelStrip, Color
+   import RPi.GPIO as GPIO
 
-3. Or add to your systemd service file:
+2. Replace NeoPixel initialization with PixelStrip:
+
+   # Old neopixel code:
+   # pixels = neopixel.NeoPixel(board.D18, num_pixels, brightness=0.1)
    
-   Environment=BLINKA_USE_GPIOMEM=1
-   Environment=BLINKA_FORCEBOARD=RASPBERRY_PI_4B
+   # New rpi_ws281x code:
+   pixels = PixelStrip(num_pixels, 18, 800000, 10, False, 255, 0)
+   pixels.begin()
+
+3. Update LED control methods:
+
+   # Old: pixels[i] = (r, g, b)
+   # New: pixels.setPixelColor(i, Color(r, g, b))
+   
+   # Old: pixels.fill((r, g, b))
+   # New: for i in range(num_pixels): pixels.setPixelColor(i, Color(r, g, b))
+
+4. Test with this script to verify it works before implementing.
+
+5. Monitor system logs for any GPIO-related errors:
+   
+   sudo dmesg | grep -i gpio
+   sudo journalctl -f | grep -i gpio
+
+Note: rpi_ws281x provides better performance and more reliable
+hardware control compared to CircuitPython libraries.
 """)

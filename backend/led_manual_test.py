@@ -66,7 +66,7 @@ class ManualLEDTester:
         except ImportError as e:
             print(f"✗ Failed to import LED controller: {e}")
             print("Make sure required packages are installed:")
-            print("  pip3 install adafruit-circuitpython-neopixel adafruit-blinka")
+            print("  pip3 install rpi_ws281x")
             return False
         except Exception as e:
             print(f"✗ Failed to initialize controller: {e}")

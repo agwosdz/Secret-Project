@@ -3,10 +3,9 @@ import json
 from unittest.mock import Mock
 import sys
 
-# Mock the hardware modules before importing app
-sys.modules['board'] = Mock()
-sys.modules['neopixel'] = Mock()
-sys.modules['adafruit_circuitpython_neopixel'] = Mock()
+# Mock hardware libraries before importing app
+sys.modules['rpi_ws281x'] = Mock()
+sys.modules['RPi.GPIO'] = Mock()
 
 from app import app
 

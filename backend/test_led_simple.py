@@ -2,38 +2,42 @@
 import os
 import time
 
-# Set environment variables for Pi Zero 2 W
-os.environ['BLINKA_FORCEBOARD'] = 'RASPBERRY_PI_ZERO_2_W'
-os.environ['BLINKA_USE_GPIOMEM'] = '1'
-
-print(f"BLINKA_FORCEBOARD: {os.environ.get('BLINKA_FORCEBOARD')}")
-print(f"BLINKA_USE_GPIOMEM: {os.environ.get('BLINKA_USE_GPIOMEM')}")
+print("Simple LED test using rpi_ws281x library")
 
 try:
-    import board
-    print(f"Board detected: {board.board_id}")
+    from rpi_ws281x import PixelStrip, Color
     
-    import neopixel
-    print("Creating NeoPixel object...")
-    pixels = neopixel.NeoPixel(board.D18, 10)
+    # LED strip configuration
+    LED_COUNT = 10        # Number of LED pixels
+    LED_PIN = 18          # GPIO pin connected to the pixels (18 uses PWM!)
+    LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
+    LED_DMA = 10          # DMA channel to use for generating signal (try 10)
+    LED_BRIGHTNESS = 76   # Set to 0 for darkest and 255 for brightest (30% = 76)
+    LED_INVERT = False    # True to invert the signal (when using NPN transistor level shift)
+    LED_CHANNEL = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
+    
+    print("Creating PixelStrip object...")
+    pixels = PixelStrip(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
+    pixels.begin()
     
     print("Testing LED - Red")
-    pixels[0] = (255, 0, 0)
+    pixels.setPixelColor(0, Color(255, 0, 0))
     pixels.show()
     time.sleep(1)
     
     print("Testing LED - Green")
-    pixels[0] = (0, 255, 0)
+    pixels.setPixelColor(0, Color(0, 255, 0))
     pixels.show()
     time.sleep(1)
     
     print("Testing LED - Blue")
-    pixels[0] = (0, 0, 255)
+    pixels.setPixelColor(0, Color(0, 0, 255))
     pixels.show()
     time.sleep(1)
     
     print("Turning off LED")
-    pixels.fill((0, 0, 0))
+    for i in range(LED_COUNT):
+        pixels.setPixelColor(i, Color(0, 0, 0))
     pixels.show()
     
     print("✓ LED test completed successfully!")

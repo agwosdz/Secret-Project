@@ -2,18 +2,19 @@ import logging
 from typing import Optional
 
 try:
-    import board
-    import neopixel
+    from rpi_ws281x import PixelStrip, Color
+    import RPi.GPIO as GPIO
     HARDWARE_AVAILABLE = True
-    logging.info("NeoPixel library loaded successfully")
+    logging.info("rpi_ws281x library loaded successfully")
 except ImportError as e:
-    logging.warning(f"NeoPixel library not available: {e}")
+    logging.warning(f"rpi_ws281x library not available: {e}")
     HARDWARE_AVAILABLE = False
-    board = None
-    neopixel = None
+    PixelStrip = None
+    Color = None
+    GPIO = None
 
 class LEDController:
-    """Controller for WS2812B LED strip using Adafruit NeoPixel library."""
+    """Controller for WS2812B LED strip using rpi_ws281x library."""
     
     def __init__(self, pin=18, num_pixels=30, brightness=0.3):
         """
@@ -41,26 +42,27 @@ class LEDController:
         self._led_state = [(0, 0, 0)] * num_pixels  # Track current LED state
         
         try:
-            # Get the appropriate pin object
-            if pin == 18:
-                board_pin = board.D18
-            elif pin == 12:
-                board_pin = board.D12
-            elif pin == 21:
-                board_pin = board.D21
-            else:
-                raise ValueError(f"Unsupported pin {pin}. Use 18, 12, or 21.")
+            # rpi_ws281x configuration
+            LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
+            LED_DMA = 10          # DMA channel to use for generating signal (try 10)
+            LED_INVERT = False    # True to invert the signal (when using NPN transistor level shift)
+            LED_CHANNEL = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
             
-            # Initialize NeoPixel strip
-            self.pixels = neopixel.NeoPixel(
-                board_pin, 
-                num_pixels, 
-                brightness=brightness, 
-                auto_write=False,
-                pixel_order=neopixel.GRB
+            # Initialize rpi_ws281x strip
+            self.pixels = PixelStrip(
+                num_pixels,
+                pin,
+                LED_FREQ_HZ,
+                LED_DMA,
+                LED_INVERT,
+                int(brightness * 255),  # Convert brightness to 0-255 range
+                LED_CHANNEL
             )
             
-            self.logger.info(f"LED controller initialized with {num_pixels} pixels on pin {pin} using NeoPixel")
+            # Initialize the library (must be called once before other functions)
+            self.pixels.begin()
+            
+            self.logger.info(f"LED controller initialized with {num_pixels} pixels on pin {pin} using rpi_ws281x")
         except Exception as e:
             self.logger.error(f"Failed to initialize LED controller: {e}")
             raise
@@ -94,8 +96,10 @@ class LEDController:
             if not self.pixels:
                 raise RuntimeError("LED controller not initialized")
             
-            # Set the pixel color
-            self.pixels[index] = color
+            # Set the pixel color using rpi_ws281x Color function
+            # Convert RGB tuple to rpi_ws281x Color format
+            r, g, b = color
+            self.pixels.setPixelColor(index, Color(r, g, b))
             
             if auto_show:
                 self.show()
@@ -162,8 +166,9 @@ class LEDController:
             if not self.pixels:
                 raise RuntimeError("LED controller not initialized")
             
-            # Turn off all pixels
-            self.pixels.fill((0, 0, 0))
+            # Turn off all pixels using rpi_ws281x
+            for i in range(self.num_pixels):
+                self.pixels.setPixelColor(i, Color(0, 0, 0))
             self.show()
             return True
             
@@ -209,11 +214,12 @@ class LEDController:
             if self.pixels:
                 # Turn off all LEDs before cleanup
                 self._led_state = [(0, 0, 0)] * self.num_pixels
-                self.pixels.fill((0, 0, 0))
+                for i in range(self.num_pixels):
+                    self.pixels.setPixelColor(i, Color(0, 0, 0))
                 self.pixels.show()
                 
-                # Deinitialize NeoPixel
-                self.pixels.deinit()
+                # Clean up rpi_ws281x resources
+                # Note: rpi_ws281x doesn't have explicit cleanup, but we set to None
                 self.pixels = None
                 self.logger.info("LED controller cleaned up successfully")
         except Exception as e:

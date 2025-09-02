@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 LED Hardware Troubleshooting Script
-Diagnoses common issues with NeoPixel LED strips on Raspberry Pi
+Diagnoses common issues with WS2812B LED strips on Raspberry Pi using rpi_ws281x
 
 Usage:
     python3 led_troubleshoot.py
@@ -85,9 +85,8 @@ def check_required_packages():
     logger.info("\n=== PYTHON PACKAGES ===")
     
     required_packages = [
-        ('adafruit-circuitpython-neopixel', 'neopixel'),
-        ('adafruit-blinka', 'board'),
-        ('rpi-ws281x', 'rpi_ws281x'),
+        ('rpi_ws281x', 'rpi_ws281x'),
+        ('RPi.GPIO', 'RPi.GPIO'),
     ]
     
     missing_packages = []
@@ -189,47 +188,57 @@ def test_gpio_basic():
         logger.error(f"✗ GPIO test failed: {e}")
         return False
 
-def test_neopixel_basic():
-    """Test basic NeoPixel functionality."""
-    logger.info("\n=== NEOPIXEL BASIC TEST ===")
+def test_led_basic():
+    """Test basic LED functionality using rpi_ws281x."""
+    logger.info("\n=== LED BASIC TEST (rpi_ws281x) ===")
     
     try:
-        import board
-        import neopixel
+        from rpi_ws281x import PixelStrip, Color
+        import RPi.GPIO as GPIO
         
-        logger.info("✓ neopixel module imported successfully")
+        logger.info("✓ rpi_ws281x module imported successfully")
         
-        # Try to create a NeoPixel object (this will fail if hardware issues exist)
-        logger.info("Attempting to create NeoPixel object...")
+        # Try to create a PixelStrip object (this will fail if hardware issues exist)
+        logger.info("Attempting to create PixelStrip object...")
         
-        pixels = neopixel.NeoPixel(board.D18, 1, brightness=0.1, auto_write=False)
-        logger.info("✓ NeoPixel object created successfully")
+        # LED strip configuration
+        LED_COUNT = 1         # Number of LED pixels
+        LED_PIN = 18          # GPIO pin connected to the pixels (18 uses PWM!)
+        LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
+        LED_DMA = 10          # DMA channel to use for generating signal (try 10)
+        LED_BRIGHTNESS = 25   # Set to 0 for darkest and 255 for brightest (10% = 25)
+        LED_INVERT = False    # True to invert the signal (when using NPN transistor level shift)
+        LED_CHANNEL = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
+        
+        pixels = PixelStrip(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
+        pixels.begin()
+        logger.info("✓ PixelStrip object created successfully")
         
         # Try to set a pixel
-        pixels[0] = (255, 0, 0)  # Red
+        pixels.setPixelColor(0, Color(255, 0, 0))  # Red
         pixels.show()
         logger.info("✓ Pixel set and show() called successfully")
         
         # Turn off
-        pixels[0] = (0, 0, 0)
+        pixels.setPixelColor(0, Color(0, 0, 0))
         pixels.show()
         
-        # Clean up
-        pixels.deinit()
-        logger.info("✓ NeoPixel test completed successfully")
+        logger.info("✓ LED test completed successfully")
         
         return True
         
     except ImportError as e:
         logger.error(f"✗ Cannot import required modules: {e}")
+        logger.info("Install with: pip3 install rpi_ws281x")
         return False
     except Exception as e:
-        logger.error(f"✗ NeoPixel test failed: {e}")
+        logger.error(f"✗ LED test failed: {e}")
         logger.info("Common causes:")
         logger.info("  - Incorrect wiring")
         logger.info("  - Insufficient power supply")
         logger.info("  - Wrong GPIO pin")
-        logger.info("  - LED strip not compatible with NeoPixel library")
+        logger.info("  - Permission issues (try running with sudo)")
+        logger.info("  - LED strip not compatible with WS2812B protocol")
         return False
 
 def run_diagnostics():
@@ -259,9 +268,9 @@ def run_diagnostics():
         logger.error("\n❌ Basic GPIO test failed - check permissions and packages")
         return False
     
-    neopixel_ok = test_neopixel_basic()
-    if not neopixel_ok:
-        logger.error("\n❌ NeoPixel test failed - check hardware connections")
+    led_ok = test_led_basic()
+    if not led_ok:
+        logger.error("\n❌ LED test failed - check hardware connections")
         return False
     
     logger.info("\n✅ ALL BASIC TESTS PASSED!")

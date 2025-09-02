@@ -1,99 +1,121 @@
-# Force /dev/gpiomem Usage Guide
+# GPIO Access and Permissions Guide for rpi_ws281x
 
-This guide explains how to force the use of `/dev/gpiomem` instead of `/dev/mem` for GPIO access on Raspberry Pi. Using `/dev/gpiomem` is safer and doesn't require root privileges.
+This guide explains GPIO access methods and permission requirements for the rpi_ws281x library on Raspberry Pi.
 
-## Why Force /dev/gpiomem?
+## rpi_ws281x Library Overview
 
-- **Security**: `/dev/gpiomem` provides access only to GPIO registers, not entire system memory
-- **No Root Required**: Regular users can access `/dev/gpiomem` with proper permissions
-- **Safer**: Reduces risk of accidentally accessing system memory
-- **Recommended**: This is the preferred method for GPIO access
+The `rpi_ws281x` library provides direct hardware access for WS281x LED strips with better performance than CircuitPython alternatives.
 
-## Methods to Force /dev/gpiomem Usage
+## Permission Requirements
 
-### Method 1: Environment Variables (Recommended)
+- **Root Access**: rpi_ws281x typically requires root privileges for direct hardware access
+- **GPIO Group**: Alternative to root - add user to gpio group
+- **Hardware PWM**: Uses hardware PWM for precise timing control
+- **DMA Access**: Requires DMA channel access for efficient data transfer
 
-Set these environment variables before importing any GPIO libraries:
+## Setup Methods
+
+### Method 1: Run with sudo (Recommended for testing)
 
 ```bash
-export BLINKA_USE_GPIOMEM=1
-export BLINKA_FORCEBOARD=RASPBERRY_PI_ZERO_2_W  # Adjust for your Pi model
-export BLINKA_FORCECHIP=BCM2XXX
+sudo python3 your_led_script.py
 ```
 
-Or in Python (before any imports):
+### Method 2: Add User to GPIO Group
 
-```python
-import os
-os.environ['BLINKA_USE_GPIOMEM'] = '1'
-os.environ['BLINKA_FORCEBOARD'] = 'RASPBERRY_PI_4B'
-os.environ['BLINKA_FORCECHIP'] = 'BCM2XXX'
-
-# Now import GPIO libraries
-import board
-import neopixel
+```bash
+sudo usermod -a -G gpio $USER
+# Log out and back in for changes to take effect
 ```
 
-### Method 2: Systemd Service Configuration
+### Method 3: Set GPIO Permissions
 
-Add environment variables to your systemd service file:
+```bash
+# Check current permissions
+ls -la /dev/gpiomem
+
+# Set permissions (temporary)
+sudo chmod 666 /dev/gpiomem
+```
+
+### Method 4: Systemd Service Configuration
+
+For production deployment, configure your systemd service to run with appropriate permissions:
 
 ```ini
+[Unit]
+Description=LED Controller Service
+After=network.target
+
 [Service]
-Environment=BLINKA_USE_GPIOMEM=1
-Environment=BLINKA_FORCEBOARD=RASPBERRY_PI_4B
-Environment=BLINKA_FORCECHIP=BCM2XXX
+Type=simple
+User=pi
+Group=gpio
+WorkingDirectory=/home/pi/your-project
+ExecStart=/usr/bin/python3 app.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
 ```
 
-### Method 3: Shell Script Wrapper
+### Method 5: Shell Script Wrapper
 
-Create a wrapper script that sets environment variables:
+Create a wrapper script for easier execution:
 
 ```bash
 #!/bin/bash
-export BLINKA_USE_GPIOMEM=1
-export BLINKA_FORCEBOARD=RASPBERRY_PI_4B
-export BLINKA_FORCECHIP=BCM2XXX
-python3 your_script.py
-```
-
-### Method 4: Alternative GPIO Library (pigpio)
-
-Use pigpio instead of the default GPIO library:
-
-```bash
-# Install pigpio
-sudo apt-get install pigpio python3-pigpio
-
-# Enable pigpio daemon
-sudo systemctl enable pigpiod
-sudo systemctl start pigpiod
-
-# Set environment variable
-export GPIOZERO_PIN_FACTORY=pigpio
+# Check if running as root or in gpio group
+if [ "$EUID" -ne 0 ] && ! groups | grep -q gpio; then
+    echo "Running with sudo for GPIO access..."
+    sudo python3 "$@"
+else
+    python3 "$@"
+fi
 ```
 
 ## Implementation in This Project
 
-### 1. LED Controller Modified
+### 1. LED Controller with rpi_ws281x
 
-The `led_controller.py` has been updated to automatically force `/dev/gpiomem` usage:
+The `led_controller.py` uses the rpi_ws281x library for direct hardware access:
 
 ```python
-# Force the use of /dev/gpiomem instead of /dev/mem for safer GPIO access
-# This must be set BEFORE importing any GPIO libraries
-os.environ['BLINKA_USE_GPIOMEM'] = '1'
-os.environ['BLINKA_FORCEBOARD'] = 'RASPBERRY_PI_4B'
-os.environ['BLINKA_FORCECHIP'] = 'BCM2XXX'
+from rpi_ws281x import PixelStrip, Color
+import RPi.GPIO as GPIO
+
+# LED strip configuration
+LED_COUNT = 144
+LED_PIN = 18          # GPIO pin (18 uses PWM!)
+LED_FREQ_HZ = 800000  # LED signal frequency
+LED_DMA = 10          # DMA channel
+LED_BRIGHTNESS = 255  # Brightness (0-255)
+LED_INVERT = False    # Signal inversion
+LED_CHANNEL = 0       # PWM channel
+
+# Initialize the LED strip
+pixels = PixelStrip(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
+pixels.begin()
 ```
 
-### 2. Deployment Scripts Updated
+### 2. Permission Handling
 
-Both `deploy-to-pi.ps1` and `deploy-to-pi.sh` now include the environment variables in the systemd service configuration.
+The application checks for proper permissions and provides helpful error messages:
+
+```python
+try:
+    pixels = PixelStrip(...)
+    pixels.begin()
+except Exception as e:
+    if "Permission denied" in str(e):
+        print("GPIO permission denied. Try running with sudo or add user to gpio group.")
+    raise
+```
 
 ### 3. Testing Scripts
 
-All testing scripts (`test_led_device.py`, `led_manual_test.py`, etc.) will automatically use the forced settings when importing `led_controller.py`.
+All testing scripts include proper error handling for permission issues and provide guidance for resolution.
 
 ## Verification
 
