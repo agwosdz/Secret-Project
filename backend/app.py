@@ -6,6 +6,7 @@ Basic Flask application with health check endpoint
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit
 import os
 import logging
 from werkzeug.utils import secure_filename
@@ -14,6 +15,7 @@ import mimetypes
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend communication
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Configure logging first
 logging.basicConfig(level=logging.INFO)
@@ -60,18 +62,6 @@ else:
     logger.info("LED controller not available (import failed)")
     led_controller = None
 
-# Initialize playback service
-if PlaybackService:
-    try:
-        playback_service = PlaybackService(led_controller=led_controller)
-        logger.info("Playback service initialized successfully")
-    except Exception as e:
-        logger.warning(f"Playback service initialization failed: {e}")
-        playback_service = None
-else:
-    logger.info("Playback service not available (import failed)")
-    playback_service = None
-
 # Initialize MIDI parser
 if MIDIParser:
     try:
@@ -83,6 +73,35 @@ if MIDIParser:
 else:
     logger.info("MIDI parser not available (import failed)")
     midi_parser = None
+
+# WebSocket status callback function
+def websocket_status_callback(status):
+    """Callback to emit playback status updates via WebSocket"""
+    try:
+        socketio.emit('playback_status', {
+            'state': status.state.value,
+            'current_time': status.current_time,
+            'total_duration': status.total_duration,
+            'progress_percentage': status.progress_percentage,
+            'filename': status.filename,
+            'error_message': status.error_message
+        })
+    except Exception as e:
+        logger.error(f"Error emitting WebSocket status: {e}")
+
+# Initialize playback service
+if PlaybackService:
+    try:
+        playback_service = PlaybackService(led_controller=led_controller, midi_parser=midi_parser)
+        # Register WebSocket callback for real-time updates
+        playback_service.add_status_callback(websocket_status_callback)
+        logger.info("Playback service initialized successfully")
+    except Exception as e:
+        logger.warning(f"Playback service initialization failed: {e}")
+        playback_service = None
+else:
+    logger.info("Playback service not available (import failed)")
+    playback_service = None
 
 @app.route('/')
 def hello_world():
@@ -530,6 +549,40 @@ def get_playback_status():
             'message': 'An unexpected error occurred while getting status'
         }), 500
 
+@app.route('/api/performance', methods=['GET'])
+def get_performance_metrics():
+    """Get performance metrics"""
+    try:
+        if not playback_service:
+            return jsonify({
+                'error': 'Service Unavailable',
+                'message': 'Playback service not initialized'
+            }), 503
+        
+        if not hasattr(playback_service, 'performance_monitor') or not playback_service.performance_monitor:
+            return jsonify({
+                'error': 'Service Unavailable',
+                'message': 'Performance monitoring not available'
+            }), 503
+        
+        current_metrics = playback_service.performance_monitor.get_current_metrics()
+        summary = playback_service.performance_monitor.get_metrics_summary()
+        
+        return jsonify({
+            'status': 'success',
+            'performance': {
+                'current': current_metrics.__dict__ if current_metrics else None,
+                'summary': summary
+            }
+        }), 200
+    
+    except Exception as e:
+        logger.error(f"Error getting performance metrics: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred while getting performance metrics'
+        }), 500
+
 @app.errorhandler(404)
 def not_found(error):
     """Handle 404 errors"""
@@ -554,13 +607,52 @@ def internal_error(error):
         'message': 'An unexpected error occurred'
     }), 500
 
+# WebSocket event handlers
+@socketio.on('connect')
+def handle_connect():
+    """Handle client connection"""
+    logger.info(f"Client connected: {request.sid}")
+    # Send current playback status to newly connected client
+    if playback_service:
+        status = playback_service.get_status()
+        emit('playback_status', {
+            'state': status.state.value,
+            'current_time': status.current_time,
+            'total_duration': status.total_duration,
+            'progress_percentage': status.progress_percentage,
+            'filename': status.filename,
+            'error_message': status.error_message
+        })
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Handle client disconnection"""
+    logger.info(f"Client disconnected: {request.sid}")
+
+@socketio.on('get_status')
+def handle_get_status():
+    """Handle request for current playback status"""
+    if playback_service:
+        status = playback_service.get_status()
+        emit('playback_status', {
+            'state': status.state.value,
+            'current_time': status.current_time,
+            'total_duration': status.total_duration,
+            'progress_percentage': status.progress_percentage,
+            'filename': status.filename,
+            'error_message': status.error_message
+        })
+    else:
+        emit('error', {'message': 'Playback service not available'})
+
 if __name__ == '__main__':
     print(f"Starting Piano LED Visualizer Backend...")
     print(f"Debug mode: {app.config['DEBUG']}")
     print(f"Host: {app.config['HOST']}")
     print(f"Port: {app.config['PORT']}")
-    
-    app.run(
+
+    socketio.run(
+        app,
         host=app.config['HOST'],
         port=app.config['PORT'],
         debug=app.config['DEBUG']

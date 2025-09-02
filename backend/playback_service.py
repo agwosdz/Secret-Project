@@ -18,6 +18,16 @@ try:
 except ImportError:
     LEDController = None
 
+try:
+    from midi_parser import MIDIParser
+except ImportError:
+    MIDIParser = None
+
+try:
+    from .performance_monitor import PerformanceMonitor
+except ImportError:
+    PerformanceMonitor = None
+
 class PlaybackState(Enum):
     """Playback state enumeration"""
     IDLE = "idle"
@@ -48,17 +58,19 @@ class PlaybackStatus:
 class PlaybackService:
     """Service for coordinating MIDI playback with LED visualization"""
     
-    def __init__(self, led_controller: Optional[LEDController] = None, num_leds: int = 30):
+    def __init__(self, led_controller: Optional[LEDController] = None, num_leds: int = 30, midi_parser: Optional[MIDIParser] = None):
         """
         Initialize playback service.
         
         Args:
             led_controller: LED controller instance
             num_leds: Number of LEDs in the strip
+            midi_parser: MIDI parser instance for file parsing
         """
         self.logger = logging.getLogger(__name__)
         self._led_controller = led_controller
         self.num_leds = num_leds
+        self._midi_parser = midi_parser or (MIDIParser() if MIDIParser else None)
         
         # Playback state
         self._state = PlaybackState.IDLE
@@ -79,6 +91,9 @@ class PlaybackService:
         # Timing precision
         self._start_time = 0.0
         self._pause_time = 0.0
+        
+        # Performance monitoring
+        self.performance_monitor = PerformanceMonitor() if PerformanceMonitor else None
         
         self.logger.info(f"PlaybackService initialized with {num_leds} LEDs")
     
@@ -153,12 +168,21 @@ class PlaybackService:
                 self._notify_status_change()
                 return False
             
-            # For now, simulate MIDI parsing
-            # In a real implementation, this would use the MIDI parser service
+            # Use MIDI parser if available, otherwise fall back to demo notes
             self._filename = filename
             
-            # Simulate note events for demo (will be replaced with actual MIDI parsing)
-            self._note_events = self._generate_demo_notes()
+            if self._midi_parser:
+                # Parse actual MIDI file
+                parsed_data = self._midi_parser.parse_file(filename)
+                if parsed_data:
+                    self._note_events = self._convert_parsed_notes(parsed_data)
+                else:
+                    self.logger.warning(f"Failed to parse MIDI file {filename}, using demo notes")
+                    self._note_events = self._generate_demo_notes()
+            else:
+                self.logger.warning("No MIDI parser available, using demo notes")
+                self._note_events = self._generate_demo_notes()
+            
             self._total_duration = max(event.time + event.duration for event in self._note_events) if self._note_events else 0
             
             self._state = PlaybackState.IDLE
@@ -201,6 +225,40 @@ class PlaybackService:
         
         return sorted(notes, key=lambda x: x.time)
     
+    def _convert_parsed_notes(self, parsed_data: Dict[str, Any]) -> List[NoteEvent]:
+        """
+        Convert parsed MIDI data to NoteEvent objects.
+        
+        Args:
+            parsed_data: Dictionary containing parsed MIDI data
+            
+        Returns:
+            List[NoteEvent]: Converted note events
+        """
+        notes = []
+        
+        try:
+            # Extract notes from parsed data
+            # Assuming parsed_data has structure: {'notes': [{'time': float, 'note': int, 'velocity': int, 'duration': float, 'channel': int}]}
+            if 'notes' in parsed_data:
+                for note_data in parsed_data['notes']:
+                    notes.append(NoteEvent(
+                        time=note_data.get('time', 0.0),
+                        note=note_data.get('note', 60),
+                        velocity=note_data.get('velocity', 80),
+                        duration=note_data.get('duration', 0.5),
+                        channel=note_data.get('channel', 0)
+                    ))
+            
+            self.logger.info(f"Converted {len(notes)} notes from parsed MIDI data")
+            
+        except Exception as e:
+            self.logger.error(f"Error converting parsed MIDI data: {e}")
+            # Fall back to demo notes on error
+            notes = self._generate_demo_notes()
+        
+        return sorted(notes, key=lambda x: x.time)
+    
     def start_playback(self) -> bool:
         """
         Start playback of loaded MIDI file.
@@ -220,6 +278,11 @@ class PlaybackService:
             # Reset events
             self._stop_event.clear()
             self._pause_event.clear()
+            
+            # Start performance monitoring
+            if self.performance_monitor:
+                self.performance_monitor.reset_metrics()
+                self.performance_monitor.start_monitoring()
             
             # Start playback thread
             self._playback_thread = threading.Thread(target=self._playback_loop, daemon=True)
@@ -284,6 +347,10 @@ class PlaybackService:
             if self._playback_thread and self._playback_thread.is_alive():
                 self._playback_thread.join(timeout=1.0)
             
+            # Stop performance monitoring
+            if self.performance_monitor:
+                self.performance_monitor.stop_monitoring()
+            
             # Turn off all LEDs
             if self._led_controller:
                 self._led_controller.turn_off_all()
@@ -304,15 +371,19 @@ class PlaybackService:
         """Main playback loop running in separate thread"""
         try:
             self.logger.info("Playback loop started")
+            last_status_update = 0
+            last_led_update = 0
             
             while not self._stop_event.is_set():
+                current_loop_time = time.time()
+                
                 # Handle pause
                 if self._pause_event.is_set():
-                    time.sleep(0.1)
+                    time.sleep(0.05)  # Reduced pause check interval
                     continue
                 
                 # Update current time
-                self._current_time = time.time() - self._start_time
+                self._current_time = current_loop_time - self._start_time
                 
                 # Check if playback is complete
                 if self._current_time >= self._total_duration:
@@ -320,17 +391,31 @@ class PlaybackService:
                     break
                 
                 # Process note events
+                note_processing_start = time.time()
                 self._process_note_events()
                 
-                # Update LED display
-                self._update_leds()
+                # Track note processing performance
+                if self.performance_monitor:
+                    note_processing_time = time.time() - note_processing_start
+                    self.performance_monitor.record_note_processing_time(note_processing_time)
                 
-                # Notify status update (limit frequency)
-                if int(self._current_time * 10) % 5 == 0:  # Every 0.5 seconds
+                # Update LED display (limit to 60 FPS max)
+                if current_loop_time - last_led_update >= 0.0167:  # ~60 FPS
+                    self._update_leds()
+                    
+                    # Track LED update
+                    if self.performance_monitor:
+                        self.performance_monitor.record_led_update()
+                    
+                    last_led_update = current_loop_time
+                
+                # Notify status update (limit to 4 Hz)
+                if current_loop_time - last_status_update >= 0.25:  # Every 0.25 seconds
                     self._notify_status_change()
+                    last_status_update = current_loop_time
                 
-                # Sleep for timing precision
-                time.sleep(0.01)  # 10ms resolution
+                # Sleep for timing precision (reduced for better responsiveness)
+                time.sleep(0.005)  # 5ms resolution
             
             # Playback finished
             if not self._stop_event.is_set():
@@ -373,15 +458,22 @@ class PlaybackService:
             return
         
         try:
-            # Turn off all LEDs first
-            self._led_controller.turn_off_all()
+            # Prepare LED data for batch update
+            led_data = {}
             
             # Map active notes to LEDs
             for note in self._active_notes.keys():
                 led_index = self._map_note_to_led(note)
                 if 0 <= led_index < self.num_leds:
                     color = self._get_note_color(note)
-                    self._led_controller.turn_on_led(led_index, color)
+                    led_data[led_index] = color
+            
+            # Turn off all LEDs first, then set active ones
+            self._led_controller.turn_off_all()
+            
+            # Use batch update for better performance
+            if led_data:
+                self._led_controller.set_multiple_leds(led_data, auto_show=True)
         
         except Exception as e:
             self.logger.error(f"Error updating LEDs: {e}")

@@ -18,9 +18,11 @@
 	let errorMessage = '';
 	let progressPercentage = 0;
 
-	// WebSocket connection (will be implemented in Task 5)
+	// WebSocket connection for real-time updates
 	let websocket: WebSocket | null = null;
 	let statusInterval: NodeJS.Timeout | null = null;
+	let reconnectAttempts = 0;
+	const maxReconnectAttempts = 5;
 
 	onMount(() => {
 		// Get song info from URL params or localStorage
@@ -36,7 +38,10 @@
 		// Load song information
 		loadSongInfo(filename);
 		
-		// Start polling for playback status
+		// Initialize WebSocket connection
+		initWebSocket();
+		
+		// Fallback polling in case WebSocket fails
 		startStatusPolling();
 	});
 
@@ -49,30 +54,88 @@
 		}
 	});
 
+	function initWebSocket() {
+		try {
+			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+			const wsUrl = `${protocol}//${window.location.host}/socket.io/?EIO=4&transport=websocket`;
+			
+			// Use Socket.IO client if available, otherwise fallback to WebSocket
+			if (typeof io !== 'undefined') {
+				// Socket.IO connection
+				websocket = io();
+				
+				websocket.on('connect', () => {
+					console.log('WebSocket connected');
+					reconnectAttempts = 0;
+					// Stop polling when WebSocket is connected
+					if (statusInterval) {
+						clearInterval(statusInterval);
+						statusInterval = null;
+					}
+					// Request current status
+					websocket.emit('get_status');
+				});
+				
+				websocket.on('playback_status', (data) => {
+					updatePlaybackState(data);
+				});
+				
+				websocket.on('disconnect', () => {
+					console.log('WebSocket disconnected');
+					// Resume polling as fallback
+					if (!statusInterval) {
+						startStatusPolling();
+					}
+				});
+				
+				websocket.on('error', (error) => {
+					console.error('WebSocket error:', error);
+					// Resume polling as fallback
+					if (!statusInterval) {
+						startStatusPolling();
+					}
+				});
+			} else {
+				console.log('Socket.IO not available, using polling');
+			}
+		} catch (error) {
+			console.error('Failed to initialize WebSocket:', error);
+		}
+	}
+	
 	function startStatusPolling() {
-		// Poll status every 100ms for smooth progress updates
+		// Poll status every 500ms (reduced frequency when WebSocket is primary)
 		statusInterval = setInterval(async () => {
 			await updateStatus();
-		}, 100);
+		}, 500);
 	}
 
+	function updatePlaybackState(data) {
+		// Handle WebSocket status updates
+		playbackState = data.state || 'idle';
+		currentTime = data.current_time || 0;
+		totalDuration = data.total_duration || 0;
+		progressPercentage = data.progress_percentage || 0;
+		
+		if (data.filename && data.filename !== songInfo.filename) {
+			songInfo.filename = data.filename;
+			songInfo.originalFilename = data.filename.replace(/_\d+_[a-f0-9]+/, '');
+		}
+		
+		if (data.error_message) {
+			errorMessage = data.error_message;
+		} else {
+			errorMessage = '';
+		}
+	}
+	
 	async function updateStatus() {
 		try {
 			const response = await fetch('/api/playback-status');
 			const data = await response.json();
 			
 			if (data.status === 'success' && data.playback) {
-				const playback = data.playback;
-				playbackState = playback.state || 'idle';
-				currentTime = playback.current_time || 0;
-				totalDuration = playback.total_duration || 0;
-				progressPercentage = playback.progress_percentage || 0;
-				
-				if (playback.error_message) {
-					errorMessage = playback.error_message;
-				} else {
-					errorMessage = '';
-				}
+				updatePlaybackState(data.playback);
 			}
 		} catch (err) {
 			console.error('Failed to get playback status:', err);

@@ -11,7 +11,8 @@ class TestPlaybackService:
     def setup_method(self):
         """Set up test fixtures"""
         self.mock_led_controller = Mock()
-        self.service = PlaybackService(led_controller=self.mock_led_controller)
+        self.mock_midi_parser = Mock()
+        self.service = PlaybackService(led_controller=self.mock_led_controller, midi_parser=self.mock_midi_parser)
     
     def test_initialization(self):
         """Test service initialization"""
@@ -29,12 +30,22 @@ class TestPlaybackService:
             temp_file.write(b'fake midi data')
             temp_path = temp_file.name
         
+        # Mock the MIDI parser to return parsed data
+        mock_parsed_data = {
+            'notes': [
+                {'time': 0.0, 'note': 60, 'velocity': 80, 'duration': 0.5, 'channel': 0},
+                {'time': 0.5, 'note': 64, 'velocity': 80, 'duration': 0.5, 'channel': 0}
+            ]
+        }
+        self.mock_midi_parser.parse_file.return_value = mock_parsed_data
+        
         try:
             result = self.service.load_midi_file(temp_path)
             assert result is True
             assert self.service.filename == temp_path  # Full path is stored
             assert self.service.total_duration > 0  # Should have simulated duration
-            assert len(self.service._note_events) > 0  # Should have demo notes
+            assert len(self.service.notes) > 0  # Should have parsed notes
+            self.mock_midi_parser.parse_file.assert_called_once_with(temp_path)
         finally:
             os.unlink(temp_path)
     
