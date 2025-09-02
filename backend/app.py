@@ -213,6 +213,181 @@ def test_led():
             'message': 'An unexpected error occurred'
         }), 500
 
+@app.route('/api/test-pattern', methods=['POST'])
+def test_pattern():
+    """Test LED pattern endpoint"""
+    try:
+        # Check if LED controller is available
+        if not led_controller:
+            return jsonify({
+                'error': 'Hardware Not Available',
+                'message': 'LED controller not initialized (development mode or hardware issue)'
+            }), 503
+        
+        # Get request data
+        try:
+            data = request.get_json(force=True)
+        except BadRequest as json_error:
+            logger.warning(f"Invalid JSON received: {json_error}")
+            return jsonify({
+                'error': 'Bad Request',
+                'message': 'Invalid JSON format'
+            }), 400
+            
+        if not data:
+            return jsonify({
+                'error': 'Bad Request',
+                'message': 'JSON data required'
+            }), 400
+        
+        # Validate required parameters
+        pattern = data.get('pattern')
+        if not pattern:
+            return jsonify({
+                'error': 'Bad Request',
+                'message': 'Pattern is required'
+            }), 400
+        
+        # Get optional parameters
+        duration = data.get('duration', 3000)  # Default 3 seconds
+        color = data.get('color', {'r': 255, 'g': 255, 'b': 255})
+        base_color = (color.get('r', 255), color.get('g', 255), color.get('b', 255))
+        
+        logger.info(f"Testing pattern '{pattern}' for {duration}ms via REST API")
+        
+        # Use the same pattern logic as WebSocket handler
+        import time
+        import threading
+        
+        if pattern == 'rainbow':
+            # Create rainbow pattern
+            for i in range(min(150, led_controller.num_pixels)):
+                hue = (i * 360 // 150) % 360
+                rgb = _hue_to_rgb(hue)
+                led_controller.turn_on_led(i, tuple(rgb), auto_show=False)
+            led_controller.show()
+        elif pattern == 'pulse':
+            # Pulse effect - fade in and out
+            def pulse_effect():
+                try:
+                    for brightness in range(0, 256, 8):  # Fade in
+                        factor = brightness / 255.0
+                        pulse_color = (int(base_color[0] * factor), int(base_color[1] * factor), int(base_color[2] * factor))
+                        for i in range(led_controller.num_pixels):
+                            led_controller.turn_on_led(i, pulse_color, auto_show=False)
+                        led_controller.show()
+                        time.sleep(0.02)
+                    for brightness in range(255, -1, -8):  # Fade out
+                        factor = brightness / 255.0
+                        pulse_color = (int(base_color[0] * factor), int(base_color[1] * factor), int(base_color[2] * factor))
+                        for i in range(led_controller.num_pixels):
+                            led_controller.turn_on_led(i, pulse_color, auto_show=False)
+                        led_controller.show()
+                        time.sleep(0.02)
+                except Exception as e:
+                    logger.error(f"Pulse effect error: {e}")
+            threading.Thread(target=pulse_effect, daemon=True).start()
+        elif pattern == 'chase':
+            # Color chase effect
+            def chase_effect():
+                try:
+                    chase_length = 5  # Number of LEDs in chase
+                    for offset in range(led_controller.num_pixels + chase_length):
+                        # Clear all LEDs
+                        for i in range(led_controller.num_pixels):
+                            led_controller.turn_on_led(i, (0, 0, 0), auto_show=False)
+                        # Set chase LEDs
+                        for i in range(chase_length):
+                            led_pos = (offset - i) % led_controller.num_pixels
+                            if 0 <= led_pos < led_controller.num_pixels:
+                                brightness = 1.0 - (i / chase_length)
+                                chase_color = (int(base_color[0] * brightness), int(base_color[1] * brightness), int(base_color[2] * brightness))
+                                led_controller.turn_on_led(led_pos, chase_color, auto_show=False)
+                        led_controller.show()
+                        time.sleep(0.05)
+                except Exception as e:
+                    logger.error(f"Chase effect error: {e}")
+            threading.Thread(target=chase_effect, daemon=True).start()
+        elif pattern == 'strobe':
+            # Strobe light effect
+            def strobe_effect():
+                try:
+                    for _ in range(20):  # 20 flashes
+                        # Flash on
+                        for i in range(led_controller.num_pixels):
+                            led_controller.turn_on_led(i, base_color, auto_show=False)
+                        led_controller.show()
+                        time.sleep(0.05)
+                        # Flash off
+                        for i in range(led_controller.num_pixels):
+                            led_controller.turn_on_led(i, (0, 0, 0), auto_show=False)
+                        led_controller.show()
+                        time.sleep(0.05)
+                except Exception as e:
+                    logger.error(f"Strobe effect error: {e}")
+            threading.Thread(target=strobe_effect, daemon=True).start()
+        elif pattern == 'fade':
+            # Fade in/out effect
+            def fade_effect():
+                try:
+                    # Fade in
+                    for brightness in range(0, 256, 4):
+                        factor = brightness / 255.0
+                        fade_color = (int(base_color[0] * factor), int(base_color[1] * factor), int(base_color[2] * factor))
+                        for i in range(led_controller.num_pixels):
+                            led_controller.turn_on_led(i, fade_color, auto_show=False)
+                        led_controller.show()
+                        time.sleep(0.03)
+                    time.sleep(1)  # Hold at full brightness
+                    # Fade out
+                    for brightness in range(255, -1, -4):
+                        factor = brightness / 255.0
+                        fade_color = (int(base_color[0] * factor), int(base_color[1] * factor), int(base_color[2] * factor))
+                        for i in range(led_controller.num_pixels):
+                            led_controller.turn_on_led(i, fade_color, auto_show=False)
+                        led_controller.show()
+                        time.sleep(0.03)
+                except Exception as e:
+                    logger.error(f"Fade effect error: {e}")
+            threading.Thread(target=fade_effect, daemon=True).start()
+        elif pattern == 'solid':
+            # Solid color fill
+            for i in range(led_controller.num_pixels):
+                led_controller.turn_on_led(i, base_color, auto_show=False)
+            led_controller.show()
+        elif pattern in ['red', 'green', 'blue', 'white']:
+            # Basic color patterns
+            color_map = {
+                'red': (255, 0, 0),
+                'green': (0, 255, 0),
+                'blue': (0, 0, 255),
+                'white': (255, 255, 255)
+            }
+            pattern_color = color_map[pattern]
+            for i in range(led_controller.num_pixels):
+                led_controller.turn_on_led(i, pattern_color, auto_show=False)
+            led_controller.show()
+        else:
+            return jsonify({
+                'error': 'Invalid Pattern',
+                'message': f'Unknown pattern: {pattern}. Available patterns: rainbow, pulse, chase, strobe, fade, solid, red, green, blue, white'
+            }), 400
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Pattern "{pattern}" started successfully',
+            'pattern': pattern,
+            'duration': duration,
+            'color': color
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error in test_pattern endpoint: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred'
+        }), 500
+
 @app.route('/api/upload-midi', methods=['POST'])
 def upload_midi():
     """Upload MIDI file endpoint with validation and secure storage"""
@@ -732,13 +907,114 @@ def handle_test_pattern(data):
         
         logger.info(f"Testing pattern '{pattern}' for {duration_ms}ms via WebSocket")
         
-        # Simple pattern implementations
+        # Get additional pattern parameters
+        color = data.get('color', {'r': 255, 'g': 255, 'b': 255})
+        base_color = (color.get('r', 255), color.get('g', 255), color.get('b', 255))
+        
+        # Pattern implementations
         if pattern == 'rainbow':
             # Create rainbow pattern
             for i in range(min(150, led_controller.num_pixels)):
                 hue = (i * 360 // 150) % 360
                 rgb = _hue_to_rgb(hue)
                 led_controller.turn_on_led(i, tuple(rgb), auto_show=False)
+            led_controller.show()
+        elif pattern == 'pulse':
+            # Pulse effect - fade in and out
+            import time
+            import threading
+            def pulse_effect():
+                try:
+                    for brightness in range(0, 256, 8):  # Fade in
+                        factor = brightness / 255.0
+                        pulse_color = (int(base_color[0] * factor), int(base_color[1] * factor), int(base_color[2] * factor))
+                        for i in range(led_controller.num_pixels):
+                            led_controller.turn_on_led(i, pulse_color, auto_show=False)
+                        led_controller.show()
+                        time.sleep(0.02)
+                    for brightness in range(255, -1, -8):  # Fade out
+                        factor = brightness / 255.0
+                        pulse_color = (int(base_color[0] * factor), int(base_color[1] * factor), int(base_color[2] * factor))
+                        for i in range(led_controller.num_pixels):
+                            led_controller.turn_on_led(i, pulse_color, auto_show=False)
+                        led_controller.show()
+                        time.sleep(0.02)
+                except Exception as e:
+                    logger.error(f"Pulse effect error: {e}")
+            threading.Thread(target=pulse_effect, daemon=True).start()
+        elif pattern == 'chase':
+            # Color chase effect
+            import time
+            import threading
+            def chase_effect():
+                try:
+                    chase_length = 5  # Number of LEDs in chase
+                    for offset in range(led_controller.num_pixels + chase_length):
+                        # Clear all LEDs
+                        for i in range(led_controller.num_pixels):
+                            led_controller.turn_on_led(i, (0, 0, 0), auto_show=False)
+                        # Set chase LEDs
+                        for i in range(chase_length):
+                            led_pos = (offset - i) % led_controller.num_pixels
+                            if 0 <= led_pos < led_controller.num_pixels:
+                                brightness = 1.0 - (i / chase_length)
+                                chase_color = (int(base_color[0] * brightness), int(base_color[1] * brightness), int(base_color[2] * brightness))
+                                led_controller.turn_on_led(led_pos, chase_color, auto_show=False)
+                        led_controller.show()
+                        time.sleep(0.05)
+                except Exception as e:
+                    logger.error(f"Chase effect error: {e}")
+            threading.Thread(target=chase_effect, daemon=True).start()
+        elif pattern == 'strobe':
+            # Strobe light effect
+            import time
+            import threading
+            def strobe_effect():
+                try:
+                    for _ in range(20):  # 20 flashes
+                        # Flash on
+                        for i in range(led_controller.num_pixels):
+                            led_controller.turn_on_led(i, base_color, auto_show=False)
+                        led_controller.show()
+                        time.sleep(0.05)
+                        # Flash off
+                        for i in range(led_controller.num_pixels):
+                            led_controller.turn_on_led(i, (0, 0, 0), auto_show=False)
+                        led_controller.show()
+                        time.sleep(0.05)
+                except Exception as e:
+                    logger.error(f"Strobe effect error: {e}")
+            threading.Thread(target=strobe_effect, daemon=True).start()
+        elif pattern == 'fade':
+            # Fade in/out effect
+            import time
+            import threading
+            def fade_effect():
+                try:
+                    # Fade in
+                    for brightness in range(0, 256, 4):
+                        factor = brightness / 255.0
+                        fade_color = (int(base_color[0] * factor), int(base_color[1] * factor), int(base_color[2] * factor))
+                        for i in range(led_controller.num_pixels):
+                            led_controller.turn_on_led(i, fade_color, auto_show=False)
+                        led_controller.show()
+                        time.sleep(0.03)
+                    time.sleep(1)  # Hold at full brightness
+                    # Fade out
+                    for brightness in range(255, -1, -4):
+                        factor = brightness / 255.0
+                        fade_color = (int(base_color[0] * factor), int(base_color[1] * factor), int(base_color[2] * factor))
+                        for i in range(led_controller.num_pixels):
+                            led_controller.turn_on_led(i, fade_color, auto_show=False)
+                        led_controller.show()
+                        time.sleep(0.03)
+                except Exception as e:
+                    logger.error(f"Fade effect error: {e}")
+            threading.Thread(target=fade_effect, daemon=True).start()
+        elif pattern == 'solid':
+            # Solid color fill
+            for i in range(led_controller.num_pixels):
+                led_controller.turn_on_led(i, base_color, auto_show=False)
             led_controller.show()
         elif pattern == 'red':
             # Fill all LEDs with red
