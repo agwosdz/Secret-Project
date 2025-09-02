@@ -19,6 +19,7 @@
 
 	// LED state management
 	let ledState = [];
+	let ledCount = 150; // Default LED count, configurable
 	let performanceMetrics = {
 		update_frequency: 0,
 		latency_ms: 0,
@@ -31,17 +32,22 @@
 	let fpsInterval;
 	let connectionHealthInterval;
 
-	// Initialize LED state with default values (150 LEDs as per story requirements)
-	const LED_COUNT = 150;
-	for (let i = 0; i < LED_COUNT; i++) {
-		ledState.push({
-			index: i,
-			r: 0,
-			g: 0,
-			b: 0,
-			brightness: 0
-		});
+	// Initialize LED state with default values
+	function initializeLEDState(count) {
+		ledState = [];
+		for (let i = 0; i < count; i++) {
+			ledState.push({
+				index: i,
+				r: 0,
+				g: 0,
+				b: 0,
+				brightness: 0
+			});
+		}
 	}
+
+	// Initialize with default LED count
+	initializeLEDState(ledCount);
 
 	onMount(() => {
 		initializeWebSocket();
@@ -214,12 +220,30 @@
 		}
 	}
 
+	// Handle LED count change
+	function handleLEDCountChange(event) {
+		const newLedCount = event.detail.ledCount;
+		if (newLedCount !== ledCount) {
+			ledCount = newLedCount;
+			initializeLEDState(ledCount);
+			
+			// Notify backend of LED count change
+			if (websocket && connectionStatus === 'connected') {
+				websocket.emit('led_count_change', {
+					ledCount: ledCount
+				});
+			}
+		}
+	}
+
 	// Handle test all LEDs functionality
 	function handleTestAll(event) {
-		const { color, brightness, delay } = event.detail;
+		const { color, brightness, delay, ledCount: testLedCount } = event.detail;
+		const actualLedCount = testLedCount || ledCount;
+		
 		if (websocket && connectionStatus === 'connected') {
 			// Test each LED sequentially with a delay
-			for (let i = 0; i < LED_COUNT; i++) {
+			for (let i = 0; i < actualLedCount; i++) {
 				setTimeout(() => {
 					websocket.emit('test_led', {
 						index: i,
@@ -240,7 +264,7 @@
 					b: 0,
 					brightness: 0
 				});
-			}, LED_COUNT * delay + 1000); // Wait for all LEDs + 1 second
+			}, actualLedCount * delay + 1000); // Wait for all LEDs + 1 second
 		}
 	}
 
@@ -339,6 +363,7 @@
 				on:ledTest={handleLEDTest}
 				on:patternTest={handlePatternTest}
 				on:testAll={handleTestAll}
+				on:ledCountChange={handleLEDCountChange}
 			/>
 		</section>
 

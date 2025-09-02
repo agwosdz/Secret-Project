@@ -13,6 +13,15 @@
 		size: 0
 	};
 
+	// Enhanced playback controls
+	let tempoMultiplier = 1.0;
+	let volumeMultiplier = 1.0;
+	let loopEnabled = false;
+	let loopStart = 0;
+	let loopEnd = 0;
+	let isDragging = false;
+	let timelineElement: HTMLElement;
+
 	// UI state
 	let isLoading = false;
 	let errorMessage = '';
@@ -43,6 +52,85 @@
 		
 		// Fallback polling in case WebSocket fails
 		startStatusPolling();
+		
+		// Add keyboard shortcuts
+		const handleKeydown = (event) => {
+			// Ignore if user is typing in an input field
+			if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+				return;
+			}
+			
+			switch (event.code) {
+				case 'Space':
+					event.preventDefault();
+					if (playbackState === 'playing') {
+						handlePause();
+					} else {
+						handlePlay();
+					}
+					break;
+				case 'KeyS':
+					event.preventDefault();
+					handleStop();
+					break;
+				case 'KeyL':
+					event.preventDefault();
+					handleLoopToggle();
+					break;
+				case 'ArrowLeft':
+					event.preventDefault();
+					// Seek backward 10 seconds
+					const newTimeBack = Math.max(0, currentTime - 10);
+					handleSeek(newTimeBack);
+					break;
+				case 'ArrowRight':
+					event.preventDefault();
+					// Seek forward 10 seconds
+					const newTimeForward = Math.min(totalDuration, currentTime + 10);
+					handleSeek(newTimeForward);
+					break;
+				case 'ArrowUp':
+					event.preventDefault();
+					// Increase volume by 10%
+					volumeMultiplier = Math.min(1, volumeMultiplier + 0.1);
+					handleVolumeChange();
+					break;
+				case 'ArrowDown':
+					event.preventDefault();
+					// Decrease volume by 10%
+					volumeMultiplier = Math.max(0, volumeMultiplier - 0.1);
+					handleVolumeChange();
+					break;
+				case 'Minus':
+				case 'NumpadSubtract':
+					event.preventDefault();
+					// Decrease tempo by 5%
+					tempoMultiplier = Math.max(0.25, tempoMultiplier - 0.05);
+					handleTempoChange();
+					break;
+				case 'Equal':
+				case 'NumpadAdd':
+					event.preventDefault();
+					// Increase tempo by 5%
+					tempoMultiplier = Math.min(2.0, tempoMultiplier + 0.05);
+					handleTempoChange();
+					break;
+				case 'Digit0':
+				case 'Numpad0':
+					event.preventDefault();
+					// Reset tempo to 1x
+					tempoMultiplier = 1.0;
+					handleTempoChange();
+					break;
+			}
+		};
+		
+		window.addEventListener('keydown', handleKeydown);
+		
+		// Store the cleanup function
+		window.keydownCleanup = () => {
+			window.removeEventListener('keydown', handleKeydown);
+		};
 	});
 
 	onDestroy(() => {
@@ -51,6 +139,10 @@
 		}
 		if (statusInterval) {
 			clearInterval(statusInterval);
+		}
+		// Clean up keyboard event listeners
+		if (window.keydownCleanup) {
+			window.keydownCleanup();
 		}
 	});
 
@@ -78,6 +170,10 @@
 				
 				websocket.on('playback_status', (data) => {
 					updatePlaybackState(data);
+				});
+				
+				websocket.on('extended_playback_status', (data) => {
+					updateExtendedPlaybackState(data);
 				});
 				
 				websocket.on('disconnect', () => {
@@ -129,6 +225,32 @@
 		}
 	}
 	
+	function updateExtendedPlaybackState(data) {
+		// Handle extended WebSocket status updates
+		playbackState = data.state || 'idle';
+		currentTime = data.current_time || 0;
+		totalDuration = data.total_duration || 0;
+		progressPercentage = data.progress_percentage || 0;
+		
+		// Update enhanced controls
+		tempoMultiplier = data.tempo_multiplier || 1.0;
+		volumeMultiplier = data.volume_multiplier || 1.0;
+		loopEnabled = data.loop_enabled || false;
+		loopStart = data.loop_start || 0;
+		loopEnd = data.loop_end || 0;
+		
+		if (data.filename && data.filename !== songInfo.filename) {
+			songInfo.filename = data.filename;
+			songInfo.originalFilename = data.filename.replace(/_\d+_[a-f0-9]+/, '');
+		}
+		
+		if (data.error_message) {
+			errorMessage = data.error_message;
+		} else {
+			errorMessage = '';
+		}
+	}
+	
 	async function updateStatus() {
 		try {
 			const response = await fetch('/api/playback-status');
@@ -147,16 +269,42 @@
 			isLoading = true;
 			errorMessage = '';
 			
-			// For now, we'll use the filename and simulate song info
-			// In a real implementation, this would fetch parsed MIDI data
+			// Initialize basic song info
 			songInfo = {
 				filename,
 				originalFilename: filename.replace(/_\d+_[a-f0-9]+/, ''), // Remove timestamp and UUID
-				size: 0 // Will be populated when we have actual file info
+				size: 0,
+				metadata: null
 			};
 			
-			// Simulate total duration (will be replaced with actual MIDI parsing)
-			totalDuration = 180; // 3 minutes for demo
+			// Fetch MIDI metadata from backend
+			try {
+				const response = await fetch('/api/parse-midi', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({ filename })
+				});
+				
+				if (response.ok) {
+					const data = await response.json();
+					if (data.metadata) {
+						songInfo.metadata = data.metadata;
+					}
+					if (data.duration) {
+						totalDuration = data.duration / 1000; // Convert ms to seconds
+					} else {
+						totalDuration = 180; // Fallback duration
+					}
+				} else {
+					console.warn('Failed to fetch MIDI metadata, using defaults');
+					totalDuration = 180; // Fallback duration
+				}
+			} catch (metadataError) {
+				console.warn('Error fetching MIDI metadata:', metadataError);
+				totalDuration = 180; // Fallback duration
+			}
 			
 		} catch (error) {
 			errorMessage = 'Failed to load song information';
@@ -230,7 +378,131 @@
 		}
 	}
 
+	// Enhanced playback control functions
+	async function handleSeek(time: number) {
+		try {
+			errorMessage = '';
+			const response = await fetch('/api/seek', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ time })
+			});
 
+			const data = await response.json();
+			if (data.status !== 'success') {
+				errorMessage = data.message || 'Failed to seek';
+			}
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : 'Network error: Failed to seek';
+			console.error('Seek error:', error);
+		}
+	}
+
+	async function handleTempoChange(tempo: number) {
+		try {
+			errorMessage = '';
+			const response = await fetch('/api/tempo', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ tempo })
+			});
+
+			const data = await response.json();
+			if (data.status !== 'success') {
+				errorMessage = data.message || 'Failed to set tempo';
+			}
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : 'Network error: Failed to set tempo';
+			console.error('Tempo error:', error);
+		}
+	}
+
+	async function handleVolumeChange(volume: number) {
+		try {
+			errorMessage = '';
+			const response = await fetch('/api/volume', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ volume })
+			});
+
+			const data = await response.json();
+			if (data.status !== 'success') {
+				errorMessage = data.message || 'Failed to set volume';
+			}
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : 'Network error: Failed to set volume';
+			console.error('Volume error:', error);
+		}
+	}
+
+	async function handleLoopToggle() {
+		try {
+			errorMessage = '';
+			const response = await fetch('/api/loop', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ 
+					enabled: !loopEnabled,
+					start: loopStart,
+					end: loopEnd || totalDuration
+				})
+			});
+
+			const data = await response.json();
+			if (data.status !== 'success') {
+				errorMessage = data.message || 'Failed to toggle loop';
+			}
+		} catch (error) {
+			errorMessage = error instanceof Error ? error.message : 'Network error: Failed to toggle loop';
+			console.error('Loop error:', error);
+		}
+	}
+
+	// Timeline interaction functions
+	function handleTimelineClick(event: MouseEvent) {
+		if (!timelineElement || totalDuration === 0) return;
+		
+		const rect = timelineElement.getBoundingClientRect();
+		const clickX = event.clientX - rect.left;
+		const percentage = clickX / rect.width;
+		const newTime = percentage * totalDuration;
+		
+		handleSeek(Math.max(0, Math.min(newTime, totalDuration)));
+	}
+
+	function handleTimelineDragStart(event: MouseEvent) {
+		isDragging = true;
+		event.preventDefault();
+	}
+
+	function handleTimelineDrag(event: MouseEvent) {
+		if (!isDragging || !timelineElement || totalDuration === 0) return;
+		
+		const rect = timelineElement.getBoundingClientRect();
+		const dragX = event.clientX - rect.left;
+		const percentage = Math.max(0, Math.min(1, dragX / rect.width));
+		const newTime = percentage * totalDuration;
+		
+		// Update current time immediately for visual feedback
+		currentTime = newTime;
+		progressPercentage = percentage * 100;
+	}
+
+	function handleTimelineDragEnd(event: MouseEvent) {
+		if (!isDragging) return;
+		
+		isDragging = false;
+		handleSeek(currentTime);
+	}
 
 	function formatTime(seconds: number): string {
 		const mins = Math.floor(seconds / 60);
@@ -267,23 +539,73 @@
 				<h2>Now Playing</h2>
 				<div class="song-details">
 					<p class="song-title">{songInfo.originalFilename || 'Unknown Song'}</p>
-					<p class="song-meta">
-						Duration: {formatTime(totalDuration)}
+					<div class="song-meta-grid">
+						<div class="meta-item">
+							<span class="meta-label">Duration:</span>
+							<span class="meta-value">{formatTime(totalDuration)}</span>
+						</div>
 						{#if songInfo.size > 0}
-							• Size: {formatFileSize(songInfo.size)}
+							<div class="meta-item">
+								<span class="meta-label">Size:</span>
+								<span class="meta-value">{formatFileSize(songInfo.size)}</span>
+							</div>
 						{/if}
-					</p>
+						{#if songInfo.metadata}
+							{#if songInfo.metadata.tempo}
+								<div class="meta-item">
+									<span class="meta-label">Tempo:</span>
+									<span class="meta-value">{songInfo.metadata.tempo} BPM</span>
+								</div>
+							{/if}
+							{#if songInfo.metadata.tracks}
+								<div class="meta-item">
+									<span class="meta-label">Tracks:</span>
+									<span class="meta-value">{songInfo.metadata.tracks}</span>
+								</div>
+							{/if}
+							{#if songInfo.metadata.type !== undefined}
+								<div class="meta-item">
+									<span class="meta-label">Type:</span>
+									<span class="meta-value">MIDI {songInfo.metadata.type}</span>
+								</div>
+							{/if}
+							{#if songInfo.metadata.title}
+								<div class="meta-item">
+									<span class="meta-label">Title:</span>
+									<span class="meta-value">{songInfo.metadata.title}</span>
+								</div>
+							{/if}
+						{/if}
+					</div>
 				</div>
 			</div>
 
-			<!-- Progress Bar -->
-			<div class="progress-section">
+			<!-- Interactive Timeline -->
+			<div class="timeline-section">
 				<div class="time-display">
 					<span class="current-time">{formatTime(currentTime)}</span>
 					<span class="total-time">{formatTime(totalDuration)}</span>
 				</div>
-				<div class="progress-bar">
-					<div class="progress-fill" style="width: {progressPercentage}%"></div>
+				<div 
+					class="timeline" 
+					bind:this={timelineElement}
+					on:click={handleTimelineClick}
+					on:mousedown={handleTimelineDragStart}
+					on:mousemove={handleTimelineDrag}
+					on:mouseup={handleTimelineDragEnd}
+					on:mouseleave={handleTimelineDragEnd}
+					class:dragging={isDragging}
+				>
+					<div class="timeline-track">
+						<div class="timeline-progress" style="width: {progressPercentage}%"></div>
+						{#if loopEnabled}
+							<div 
+								class="loop-region" 
+								style="left: {(loopStart / totalDuration) * 100}%; width: {((loopEnd - loopStart) / totalDuration) * 100}%"
+							></div>
+						{/if}
+						<div class="timeline-handle" style="left: {progressPercentage}%"></div>
+					</div>
 				</div>
 				<div class="progress-info">
 					<span class="time">{formatTime(currentTime)} / {formatTime(totalDuration)}</span>
@@ -329,6 +651,68 @@
 				</button>
 			</div>
 
+			<!-- Enhanced Controls -->
+			<div class="enhanced-controls">
+				<!-- Tempo Control -->
+				<div class="control-group">
+					<label for="tempo-slider">Tempo: {Math.round(tempoMultiplier * 100)}%</label>
+					<input 
+						id="tempo-slider"
+						type="range" 
+						min="0.25" 
+						max="2.0" 
+						step="0.05" 
+						bind:value={tempoMultiplier}
+						on:input={handleTempoChange}
+						class="slider tempo-slider"
+					/>
+					<div class="slider-labels">
+						<span>0.25x</span>
+						<span>1x</span>
+						<span>2x</span>
+					</div>
+				</div>
+
+				<!-- Volume Control -->
+				<div class="control-group">
+					<label for="volume-slider">Volume: {Math.round(volumeMultiplier * 100)}%</label>
+					<input 
+						id="volume-slider"
+						type="range" 
+						min="0" 
+						max="1" 
+						step="0.01" 
+						bind:value={volumeMultiplier}
+						on:input={handleVolumeChange}
+						class="slider volume-slider"
+					/>
+					<div class="slider-labels">
+						<span>0%</span>
+						<span>50%</span>
+						<span>100%</span>
+					</div>
+				</div>
+
+				<!-- Loop Control -->
+				<div class="control-group loop-control">
+					<button 
+						on:click={handleLoopToggle}
+						class="control-btn loop-btn"
+						class:active={loopEnabled}
+					>
+						<svg viewBox="0 0 24 24" fill="currentColor">
+							<path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
+						</svg>
+						Loop {loopEnabled ? 'On' : 'Off'}
+					</button>
+					{#if loopEnabled}
+						<div class="loop-info">
+							<span>Loop: {formatTime(loopStart)} - {formatTime(loopEnd)}</span>
+						</div>
+					{/if}
+				</div>
+			</div>
+
 			<!-- Status Display -->
 			<div class="status-section">
 				<div class="status-indicator" class:playing={playbackState === 'playing'} class:paused={playbackState === 'paused'}>
@@ -345,6 +729,55 @@
 						{/if}
 					</span>
 				</div>
+			</div>
+
+			<!-- Keyboard Shortcuts Help -->
+			<div class="keyboard-shortcuts">
+				<details>
+					<summary>⌨️ Keyboard Shortcuts</summary>
+					<div class="shortcuts-grid">
+						<div class="shortcut-item">
+							<kbd>Space</kbd>
+							<span>Play/Pause</span>
+						</div>
+						<div class="shortcut-item">
+							<kbd>S</kbd>
+							<span>Stop</span>
+						</div>
+						<div class="shortcut-item">
+							<kbd>L</kbd>
+							<span>Toggle Loop</span>
+						</div>
+						<div class="shortcut-item">
+							<kbd>←</kbd>
+							<span>Seek -10s</span>
+						</div>
+						<div class="shortcut-item">
+							<kbd>→</kbd>
+							<span>Seek +10s</span>
+						</div>
+						<div class="shortcut-item">
+							<kbd>↑</kbd>
+							<span>Volume +10%</span>
+						</div>
+						<div class="shortcut-item">
+							<kbd>↓</kbd>
+							<span>Volume -10%</span>
+						</div>
+						<div class="shortcut-item">
+							<kbd>+</kbd>
+							<span>Tempo +5%</span>
+						</div>
+						<div class="shortcut-item">
+							<kbd>-</kbd>
+							<span>Tempo -5%</span>
+						</div>
+						<div class="shortcut-item">
+							<kbd>0</kbd>
+							<span>Reset Tempo</span>
+						</div>
+					</div>
+				</details>
 			</div>
 
 			<!-- Error Display -->
@@ -434,13 +867,39 @@
 		margin-bottom: 0.5rem;
 	}
 
-	.song-meta {
-		color: #6b7280;
-		font-size: 0.875rem;
-		margin: 0;
+	.song-meta-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+		gap: 0.75rem;
+		margin-top: 0.75rem;
 	}
 
-	.progress-section {
+	.meta-item {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		padding: 0.75rem;
+		background: white;
+		border-radius: 8px;
+		border: 1px solid #e5e7eb;
+	}
+
+	.meta-label {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: #6b7280;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.meta-value {
+		font-size: 0.875rem;
+		font-weight: 600;
+		color: #374151;
+	}
+
+	/* Timeline Section */
+	.timeline-section {
 		margin-bottom: 2rem;
 	}
 
@@ -453,18 +912,66 @@
 		font-weight: 500;
 	}
 
-	.progress-bar {
+	.timeline {
+		width: 100%;
+		height: 20px;
+		padding: 6px 0;
+		cursor: pointer;
+		user-select: none;
+	}
+
+	.timeline.dragging {
+		cursor: grabbing;
+	}
+
+	.timeline-track {
+		position: relative;
 		width: 100%;
 		height: 8px;
 		background: #e5e7eb;
 		border-radius: 4px;
-		overflow: hidden;
+		overflow: visible;
 	}
 
-	.progress-fill {
+	.timeline-progress {
 		height: 100%;
 		background: linear-gradient(90deg, #3b82f6, #1d4ed8);
-		transition: width 0.3s ease;
+		transition: width 0.1s ease;
+		border-radius: 4px;
+	}
+
+	.timeline-handle {
+		position: absolute;
+		top: -4px;
+		width: 16px;
+		height: 16px;
+		background: #1d4ed8;
+		border: 2px solid white;
+		border-radius: 50%;
+		transform: translateX(-50%);
+		cursor: grab;
+		box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+		transition: all 0.1s ease;
+	}
+
+	.timeline-handle:hover {
+		transform: translateX(-50%) scale(1.2);
+		box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+	}
+
+	.timeline.dragging .timeline-handle {
+		cursor: grabbing;
+		transform: translateX(-50%) scale(1.3);
+	}
+
+	.loop-region {
+		position: absolute;
+		top: 0;
+		height: 100%;
+		background: rgba(34, 197, 94, 0.3);
+		border: 2px solid #22c55e;
+		border-radius: 4px;
+		pointer-events: none;
 	}
 
 	.progress-info {
@@ -551,6 +1058,117 @@
 		opacity: 0.6;
 	}
 
+	/* Enhanced Controls */
+	.enhanced-controls {
+		margin-bottom: 2rem;
+		padding: 1.5rem;
+		background: #f8fafc;
+		border-radius: 12px;
+		display: grid;
+		gap: 1.5rem;
+		grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+	}
+
+	.control-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.control-group label {
+		font-weight: 600;
+		color: #374151;
+		font-size: 0.875rem;
+	}
+
+	.slider {
+		width: 100%;
+		height: 6px;
+		border-radius: 3px;
+		background: #e5e7eb;
+		outline: none;
+		cursor: pointer;
+		-webkit-appearance: none;
+		appearance: none;
+	}
+
+	.slider::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		appearance: none;
+		width: 18px;
+		height: 18px;
+		border-radius: 50%;
+		background: #3b82f6;
+		border: 2px solid white;
+		box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.slider::-webkit-slider-thumb:hover {
+		transform: scale(1.2);
+		box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+	}
+
+	.slider::-moz-range-thumb {
+		width: 18px;
+		height: 18px;
+		border-radius: 50%;
+		background: #3b82f6;
+		border: 2px solid white;
+		box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+
+	.tempo-slider::-webkit-slider-thumb {
+		background: #8b5cf6;
+	}
+
+	.volume-slider::-webkit-slider-thumb {
+		background: #10b981;
+	}
+
+	.slider-labels {
+		display: flex;
+		justify-content: space-between;
+		font-size: 0.75rem;
+		color: #6b7280;
+		margin-top: 0.25rem;
+	}
+
+	.loop-control {
+		align-items: flex-start;
+	}
+
+	.loop-btn {
+		background: #6366f1;
+		color: white;
+		margin-bottom: 0.5rem;
+	}
+
+	.loop-btn:hover:not(:disabled) {
+		background: #4f46e5;
+	}
+
+	.loop-btn.active {
+		background: #22c55e;
+	}
+
+	.loop-btn.active:hover {
+		background: #16a34a;
+	}
+
+	.loop-info {
+		padding: 0.5rem;
+		background: rgba(34, 197, 94, 0.1);
+		border: 1px solid #22c55e;
+		border-radius: 6px;
+		font-size: 0.875rem;
+		color: #166534;
+		font-weight: 500;
+	}
+
 	.status-section {
 		margin-bottom: 2rem;
 	}
@@ -587,6 +1205,65 @@
 	.status-text {
 		font-weight: 600;
 		color: #374151;
+	}
+
+	/* Keyboard Shortcuts */
+	.keyboard-shortcuts {
+		margin-bottom: 2rem;
+	}
+
+	.keyboard-shortcuts details {
+		background: #f8fafc;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+		padding: 1rem;
+	}
+
+	.keyboard-shortcuts summary {
+		cursor: pointer;
+		font-weight: 600;
+		color: #374151;
+		user-select: none;
+		padding: 0.5rem 0;
+	}
+
+	.keyboard-shortcuts summary:hover {
+		color: #1f2937;
+	}
+
+	.shortcuts-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+		gap: 0.75rem;
+		margin-top: 1rem;
+	}
+
+	.shortcut-item {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.5rem;
+		background: white;
+		border-radius: 6px;
+		border: 1px solid #e5e7eb;
+	}
+
+	.shortcut-item kbd {
+		background: #374151;
+		color: white;
+		padding: 0.25rem 0.5rem;
+		border-radius: 4px;
+		font-size: 0.75rem;
+		font-weight: 600;
+		min-width: 24px;
+		text-align: center;
+		box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+	}
+
+	.shortcut-item span {
+		font-size: 0.875rem;
+		color: #6b7280;
+		flex: 1;
 	}
 
 	.error-message {

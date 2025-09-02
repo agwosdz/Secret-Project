@@ -12,6 +12,7 @@
 	let selectedBrightness = 0.8;
 	let testPattern = 'rainbow';
 	let patternDuration = 5000;
+	let ledCount = 150; // Default LED count
 
 	// Available test patterns
 	const patterns = [
@@ -53,6 +54,19 @@
 	// Handle preset color selection
 	function selectPresetColor(color) {
 		selectedColor = { ...color };
+	}
+
+	// Handle LED count change
+	function handleLEDCountChange() {
+		// Ensure selected LED index is within bounds
+		if (selectedLEDIndex >= ledCount) {
+			selectedLEDIndex = Math.max(0, ledCount - 1);
+		}
+		
+		// Dispatch LED count change to parent
+		dispatch('ledCountChange', {
+			ledCount: ledCount
+		});
 	}
 
 	// Test individual LED
@@ -105,7 +119,8 @@
 		dispatch('testAll', {
 			color: selectedColor,
 			brightness: selectedBrightness,
-			delay: 100 // 100ms delay between each LED
+			delay: 100, // 100ms delay between each LED
+			ledCount: ledCount // Pass the current LED count
 		});
 	}
 
@@ -126,13 +141,27 @@
 		<h3>Individual LED Control</h3>
 		
 		<div class="control-group">
+			<label for="led-count">LED Count:</label>
+			<input 
+				id="led-count"
+				type="number" 
+				bind:value={ledCount} 
+				min="1" 
+				max="300"
+				disabled={!isConnected}
+				class="number-input"
+				on:input={handleLEDCountChange}
+			/>
+		</div>
+
+		<div class="control-group">
 			<label for="led-index">LED Index:</label>
 			<input 
 				id="led-index"
 				type="number" 
 				bind:value={selectedLEDIndex} 
 				min="0" 
-				max="59"
+				max={ledCount - 1}
 				disabled={!isConnected}
 				class="number-input"
 			/>

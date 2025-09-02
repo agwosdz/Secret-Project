@@ -91,19 +91,19 @@ server {
     }
     
     location /api/ {
-        proxy_pass http://localhost:5000;
+        proxy_pass http://localhost:5001;
         proxy_set_header Host `$host;
         proxy_set_header X-Real-IP `$remote_addr;
     }
     
     location /health {
-        proxy_pass http://localhost:5000/health;
+        proxy_pass http://localhost:5001/health;
         proxy_set_header Host `$host;
         proxy_set_header X-Real-IP `$remote_addr;
     }
     
     location /socket.io/ {
-        proxy_pass http://localhost:5000;
+        proxy_pass http://localhost:5001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade `$http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -129,11 +129,11 @@ server {
 
     # Test the health endpoint
     try {
-        Invoke-PiCommand "curl -f http://localhost:5000/health > /dev/null 2>&1"
+        Invoke-PiCommand "curl -f http://localhost:5001/health > /dev/null 2>&1"
         Write-Host "✅ Backend health check: PASSED" -ForegroundColor Green
     }
     catch {
-        Write-Host "❌ Backend health check: FAILED" -ForegroundColor Redsudo 
+        Write-Host "❌ Backend health check: FAILED" -ForegroundColor Red
         Write-Host "Check logs with: ssh $PI_USER@$PiIP 'sudo journalctl -u piano-led-visualizer.service -f'" -ForegroundColor Yellow
     }
 

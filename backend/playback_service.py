@@ -92,6 +92,13 @@ class PlaybackService:
         self._start_time = 0.0
         self._pause_time = 0.0
         
+        # New Story 1.8 features
+        self._tempo_multiplier = 1.0  # 1.0 = normal speed, 0.5 = half speed, 2.0 = double speed
+        self._volume_multiplier = 1.0  # 0.0 = mute, 1.0 = full volume
+        self._loop_enabled = False
+        self._loop_start = 0.0
+        self._loop_end = 0.0
+        
         # Performance monitoring
         self.performance_monitor = PerformanceMonitor() if PerformanceMonitor else None
         
@@ -126,18 +133,43 @@ class PlaybackService:
     def led_controller(self):
         """Get LED controller instance"""
         return self._led_controller
-    
+
     @led_controller.setter
     def led_controller(self, value):
         """Set LED controller"""
         self._led_controller = value
+    
+    @property
+    def tempo_multiplier(self) -> float:
+        """Get current tempo multiplier"""
+        return self._tempo_multiplier
+    
+    @property
+    def volume_multiplier(self) -> float:
+        """Get current volume multiplier"""
+        return self._volume_multiplier
+    
+    @property
+    def loop_enabled(self) -> bool:
+        """Get loop enabled status"""
+        return self._loop_enabled
+    
+    @property
+    def loop_start(self) -> float:
+        """Get loop start time"""
+        return self._loop_start
+    
+    @property
+    def loop_end(self) -> float:
+        """Get loop end time"""
+        return self._loop_end
     
     def add_status_callback(self, callback: Callable[[PlaybackStatus], None]):
         """Add a callback for status changes"""
         self._status_callbacks.append(callback)
     
     def remove_status_callback(self, callback: Callable[[PlaybackStatus], None]):
-        """Remove a status change callback"""
+        """Remove a status callback"""
         if callback in self._status_callbacks:
             self._status_callbacks.remove(callback)
     
@@ -149,6 +181,92 @@ class PlaybackService:
                 callback(status)
             except Exception as e:
                 self.logger.error(f"Error in status callback: {e}")
+    
+    def seek_to_time(self, time_seconds: float) -> bool:
+        """Seek to a specific time in the playback"""
+        try:
+            if not self._note_events:
+                self.logger.error("No MIDI file loaded for seeking")
+                return False
+            
+            # Clamp time to valid range
+            time_seconds = max(0.0, min(time_seconds, self._total_duration))
+            
+            # Update current time
+            self._current_time = time_seconds
+            
+            # If playing, adjust start time to maintain sync
+            if self._state == PlaybackState.PLAYING:
+                self._start_time = time.time() - self._current_time / self._tempo_multiplier
+            
+            # Clear active notes and update LEDs
+            self._active_notes.clear()
+            if self._led_controller:
+                self._led_controller.turn_off_all()
+            
+            self.logger.info(f"Seeked to {time_seconds:.2f}s")
+            self._notify_status_change()
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to seek: {e}")
+            return False
+    
+    def set_tempo(self, multiplier: float) -> bool:
+        """Set tempo multiplier (1.0 = normal, 0.5 = half speed, 2.0 = double speed)"""
+        try:
+            # Clamp tempo to reasonable range
+            multiplier = max(0.1, min(multiplier, 4.0))
+            
+            # If playing, adjust start time to maintain current position
+            if self._state == PlaybackState.PLAYING:
+                current_real_time = time.time()
+                elapsed_playback_time = (current_real_time - self._start_time) * self._tempo_multiplier
+                self._start_time = current_real_time - elapsed_playback_time / multiplier
+            
+            self._tempo_multiplier = multiplier
+            self.logger.info(f"Tempo set to {multiplier:.2f}x")
+            self._notify_status_change()
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to set tempo: {e}")
+            return False
+    
+    def set_volume(self, multiplier: float) -> bool:
+        """Set volume multiplier (0.0 = mute, 1.0 = full volume)"""
+        try:
+            # Clamp volume to valid range
+            multiplier = max(0.0, min(multiplier, 1.0))
+            self._volume_multiplier = multiplier
+            self.logger.info(f"Volume set to {multiplier:.2f}")
+            self._notify_status_change()
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to set volume: {e}")
+            return False
+    
+    def set_loop(self, enabled: bool, start_time: float = 0.0, end_time: float = 0.0) -> bool:
+        """Set loop parameters"""
+        try:
+            self._loop_enabled = enabled
+            if enabled:
+                # Validate and set loop points
+                start_time = max(0.0, min(start_time, self._total_duration))
+                end_time = max(start_time + 1.0, min(end_time, self._total_duration))
+                self._loop_start = start_time
+                self._loop_end = end_time
+                self.logger.info(f"Loop enabled: {start_time:.2f}s - {end_time:.2f}s")
+            else:
+                self.logger.info("Loop disabled")
+            
+            self._notify_status_change()
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to set loop: {e}")
+            return False
     
     def load_midi_file(self, filename: str) -> bool:
         """
@@ -321,7 +439,7 @@ class PlaybackService:
             self._playback_thread.start()
             
             self._state = PlaybackState.PLAYING
-            self._start_time = time.time() - self._current_time  # Account for resume
+            self._start_time = time.time() - self._current_time / self._tempo_multiplier  # Account for resume and tempo
             
             self.logger.info("Playback started")
             self._notify_status_change()
@@ -414,11 +532,20 @@ class PlaybackService:
                     time.sleep(0.05)  # Reduced pause check interval
                     continue
                 
-                # Update current time
-                self._current_time = current_loop_time - self._start_time
+                # Update current time with tempo adjustment
+                self._current_time = (current_loop_time - self._start_time) * self._tempo_multiplier
                 
-                # Check if playback is complete
-                if self._current_time >= self._total_duration:
+                # Handle loop functionality
+                if self._loop_enabled and self._current_time >= self._loop_end:
+                    self.logger.info(f"Loop: jumping from {self._current_time:.2f}s to {self._loop_start:.2f}s")
+                    self._current_time = self._loop_start
+                    self._start_time = current_loop_time - self._current_time / self._tempo_multiplier
+                    self._active_notes.clear()
+                    if self._led_controller:
+                        self._led_controller.turn_off_all()
+                
+                # Check if playback is complete (only if not looping)
+                elif self._current_time >= self._total_duration:
                     self.logger.info("Playback completed")
                     break
                 
@@ -498,7 +625,9 @@ class PlaybackService:
                 led_index = self._map_note_to_led(note)
                 if 0 <= led_index < self.num_leds:
                     color = self._get_note_color(note)
-                    led_data[led_index] = color
+                    # Apply volume multiplier to brightness
+                    adjusted_color = tuple(int(c * self._volume_multiplier) for c in color)
+                    led_data[led_index] = adjusted_color
             
             # Turn off all LEDs first, then set active ones
             self._led_controller.turn_off_all()
@@ -579,6 +708,23 @@ class PlaybackService:
             progress_percentage=progress,
             error_message=None if self._state != PlaybackState.ERROR else "Playback error occurred"
         )
+    
+    def get_extended_status(self) -> Dict[str, Any]:
+        """Get extended playback status including new controls"""
+        basic_status = self.get_status()
+        return {
+            'state': basic_status.state.value,
+            'current_time': basic_status.current_time,
+            'total_duration': basic_status.total_duration,
+            'filename': basic_status.filename,
+            'progress_percentage': basic_status.progress_percentage,
+            'error_message': basic_status.error_message,
+            'tempo_multiplier': self._tempo_multiplier,
+            'volume_multiplier': self._volume_multiplier,
+            'loop_enabled': self._loop_enabled,
+            'loop_start': self._loop_start,
+            'loop_end': self._loop_end
+        }
     
     def cleanup(self):
         """Clean up resources"""

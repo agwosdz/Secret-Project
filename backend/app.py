@@ -43,9 +43,12 @@ except ImportError as e:
 # Configuration
 app.config['DEBUG'] = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
 app.config['HOST'] = os.environ.get('FLASK_HOST', '0.0.0.0')
-app.config['PORT'] = int(os.environ.get('FLASK_PORT', 5000))
+app.config['PORT'] = int(os.environ.get('FLASK_PORT', 5001))
 app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024  # 1MB max file size
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+
+# LED Configuration
+LED_COUNT = int(os.environ.get('LED_COUNT', 150))  # Default 150 LEDs, configurable via environment or WebSocket
 
 # Create upload directory if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -78,6 +81,7 @@ else:
 def websocket_status_callback(status):
     """Callback to emit playback status updates via WebSocket"""
     try:
+        # Emit basic status for compatibility
         socketio.emit('playback_status', {
             'state': status.state.value,
             'current_time': status.current_time,
@@ -86,6 +90,11 @@ def websocket_status_callback(status):
             'filename': status.filename,
             'error_message': status.error_message
         })
+        
+        # Emit extended status for new features
+        if playback_service:
+            extended_status = playback_service.get_extended_status()
+            socketio.emit('extended_playback_status', extended_status)
     except Exception as e:
         logger.error(f"Error emitting WebSocket status: {e}")
 
@@ -300,8 +309,8 @@ def test_pattern():
         
         if pattern == 'rainbow':
             # Create rainbow pattern
-            for i in range(min(150, led_controller.num_pixels)):
-                hue = (i * 360 // 150) % 360
+            for i in range(min(LED_COUNT, led_controller.num_pixels)):
+                hue = (i * 360 // LED_COUNT) % 360
                 rgb = _hue_to_rgb(hue)
                 led_controller.turn_on_led(i, tuple(rgb), auto_show=False)
             led_controller.show()
@@ -580,17 +589,24 @@ def parse_midi():
         
         # Parse the MIDI file
         try:
-            note_sequence = midi_parser.parse_file(file_path)
+            parsed_data = midi_parser.parse_file(file_path)
+            
+            # Extract components from parsed data
+            note_sequence = parsed_data.get('events', [])
+            duration = parsed_data.get('duration', 0)
+            metadata = parsed_data.get('metadata', {})
             
             # Log successful parsing
-            logger.info(f"MIDI file parsed successfully: {filename} ({len(note_sequence)} notes)")
+            logger.info(f"MIDI file parsed successfully: {filename} ({len(note_sequence)} notes, {duration}ms duration)")
             
             return jsonify({
                 'status': 'success',
                 'message': 'MIDI file parsed successfully',
                 'filename': filename,
                 'note_count': len(note_sequence),
-                'notes': note_sequence
+                'notes': note_sequence,
+                'duration': duration,
+                'metadata': metadata
             }), 200
             
         except Exception as e:
@@ -763,6 +779,181 @@ def get_playback_status():
             'message': 'An unexpected error occurred while getting status'
         }), 500
 
+@app.route('/api/seek', methods=['POST'])
+def seek_playback():
+    """Seek to specific time in playback"""
+    try:
+        if not playback_service:
+            return jsonify({
+                'error': 'Service Unavailable',
+                'message': 'Playback service not initialized'
+            }), 503
+        
+        data = request.get_json()
+        if not data or 'time' not in data:
+            return jsonify({
+                'error': 'Bad Request',
+                'message': 'Time parameter is required'
+            }), 400
+        
+        seek_time = float(data['time'])
+        playback_service.seek_to_time(seek_time)
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Seeked to {seek_time:.2f} seconds'
+        }), 200
+    
+    except ValueError as e:
+        return jsonify({
+            'error': 'Bad Request',
+            'message': f'Invalid time value: {str(e)}'
+        }), 400
+    except Exception as e:
+        logger.error(f"Error in seek endpoint: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred while seeking'
+        }), 500
+
+@app.route('/api/tempo', methods=['POST'])
+def set_tempo():
+    """Set playback tempo multiplier"""
+    try:
+        if not playback_service:
+            return jsonify({
+                'error': 'Service Unavailable',
+                'message': 'Playback service not initialized'
+            }), 503
+        
+        data = request.get_json()
+        if not data or 'tempo' not in data:
+            return jsonify({
+                'error': 'Bad Request',
+                'message': 'Tempo parameter is required'
+            }), 400
+        
+        tempo = float(data['tempo'])
+        playback_service.set_tempo(tempo)
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Tempo set to {tempo:.2f}x'
+        }), 200
+    
+    except ValueError as e:
+        return jsonify({
+            'error': 'Bad Request',
+            'message': f'Invalid tempo value: {str(e)}'
+        }), 400
+    except Exception as e:
+        logger.error(f"Error in tempo endpoint: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred while setting tempo'
+        }), 500
+
+@app.route('/api/volume', methods=['POST'])
+def set_volume():
+    """Set playback volume multiplier"""
+    try:
+        if not playback_service:
+            return jsonify({
+                'error': 'Service Unavailable',
+                'message': 'Playback service not initialized'
+            }), 503
+        
+        data = request.get_json()
+        if not data or 'volume' not in data:
+            return jsonify({
+                'error': 'Bad Request',
+                'message': 'Volume parameter is required'
+            }), 400
+        
+        volume = float(data['volume'])
+        playback_service.set_volume(volume)
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Volume set to {volume:.2f}x'
+        }), 200
+    
+    except ValueError as e:
+        return jsonify({
+            'error': 'Bad Request',
+            'message': f'Invalid volume value: {str(e)}'
+        }), 400
+    except Exception as e:
+        logger.error(f"Error in volume endpoint: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred while setting volume'
+        }), 500
+
+@app.route('/api/loop', methods=['POST'])
+def set_loop():
+    """Set loop parameters"""
+    try:
+        if not playback_service:
+            return jsonify({
+                'error': 'Service Unavailable',
+                'message': 'Playback service not initialized'
+            }), 503
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'error': 'Bad Request',
+                'message': 'Request body is required'
+            }), 400
+        
+        enabled = data.get('enabled', False)
+        start_time = data.get('start', 0.0)
+        end_time = data.get('end', None)
+        
+        playback_service.set_loop(enabled, start_time, end_time)
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Loop {"enabled" if enabled else "disabled"}'
+        }), 200
+    
+    except ValueError as e:
+        return jsonify({
+            'error': 'Bad Request',
+            'message': f'Invalid loop parameters: {str(e)}'
+        }), 400
+    except Exception as e:
+        logger.error(f"Error in loop endpoint: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred while setting loop'
+        }), 500
+
+@app.route('/api/extended-status', methods=['GET'])
+def get_extended_status():
+    """Get extended playback status including new controls"""
+    try:
+        if not playback_service:
+            return jsonify({
+                'error': 'Service Unavailable',
+                'message': 'Playback service not initialized'
+            }), 503
+        
+        status = playback_service.get_extended_status()
+        
+        return jsonify({
+            'status': 'success',
+            'playback': status
+        }), 200
+    
+    except Exception as e:
+        logger.error(f"Error in get_extended_status endpoint: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred while getting extended status'
+        }), 500
+
 @app.route('/api/performance', methods=['GET'])
 def get_performance_metrics():
     """Get performance metrics"""
@@ -916,8 +1107,8 @@ def handle_test_led(data):
             brightness = brightness / 100.0
             
         # Validate inputs
-        if led_index != -1 and not (0 <= led_index < 150):
-            emit('error', {'message': f'Invalid LED index: {led_index}'})
+        if led_index != -1 and not (0 <= led_index < LED_COUNT):
+            emit('error', {'message': f'Invalid LED index: {led_index}. Valid range: 0-{LED_COUNT-1}'})
             return
             
         if not (0 <= brightness <= 1.0):
@@ -940,7 +1131,7 @@ def handle_test_led(data):
                 })
             else:
                 # Fill all LEDs with color
-                for i in range(min(150, led_controller.num_pixels)):
+                for i in range(min(LED_COUNT, led_controller.num_pixels)):
                     led_controller.turn_on_led(i, tuple(adjusted_rgb), auto_show=False)
                 led_controller.show()
                 logger.info(f"All LEDs filled with RGB{adjusted_rgb} via WebSocket")
@@ -984,8 +1175,8 @@ def handle_test_pattern(data):
         # Pattern implementations
         if pattern == 'rainbow':
             # Create rainbow pattern
-            for i in range(min(150, led_controller.num_pixels)):
-                hue = (i * 360 // 150) % 360
+            for i in range(min(LED_COUNT, led_controller.num_pixels)):
+                hue = (i * 360 // LED_COUNT) % 360
                 rgb = _hue_to_rgb(hue)
                 led_controller.turn_on_led(i, tuple(rgb), auto_show=False)
             led_controller.show()
@@ -1128,6 +1319,33 @@ def _hue_to_rgb(hue):
     r, g, b = colorsys.hsv_to_rgb(hue / 360.0, 1.0, 1.0)
     return [int(r * 255), int(g * 255), int(b * 255)]
 
+@socketio.on('led_count_change')
+def handle_led_count_change(data):
+    """Handle LED count configuration change"""
+    global LED_COUNT
+    
+    try:
+        new_led_count = int(data.get('ledCount', LED_COUNT))
+        
+        # Validate LED count range
+        if not (1 <= new_led_count <= 300):
+            emit('error', {'message': f'Invalid LED count: {new_led_count}. Valid range: 1-300'})
+            return
+            
+        # Update global LED count
+        LED_COUNT = new_led_count
+        logger.info(f"LED count updated to: {LED_COUNT}")
+        
+        # Emit confirmation to all clients
+        socketio.emit('led_count_updated', {
+            'ledCount': LED_COUNT,
+            'message': f'LED count updated to {LED_COUNT}'
+        })
+        
+    except (ValueError, TypeError) as e:
+        emit('error', {'message': f'Invalid LED count data: {e}'})
+        logger.error(f"LED count change error: {e}")
+
 @socketio.on('disconnect')
 def handle_disconnect():
     """Handle client disconnection"""
@@ -1159,5 +1377,6 @@ if __name__ == '__main__':
         app,
         host=app.config['HOST'],
         port=app.config['PORT'],
-        debug=app.config['DEBUG']
+        debug=app.config['DEBUG'],
+        allow_unsafe_werkzeug=True
     )

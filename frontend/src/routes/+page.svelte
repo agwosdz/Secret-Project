@@ -48,7 +48,7 @@
 		<p>This is the foundation setup for the Piano LED Visualizer. The system is ready for development!</p>
 		<ul>
 			<li>✅ Monorepo structure initialized</li>
-			<li>✅ Flask backend running on port 5000</li>
+			<li>✅ Flask backend running on port 5001</li>
 			<li>✅ SvelteKit frontend running on port 5173</li>
 			<li>✅ Health check endpoint working</li>
 		</ul>
