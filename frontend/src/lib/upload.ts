@@ -28,7 +28,7 @@ export class UploadError extends Error {
 }
 
 /**
- * Validates a file before upload
+ * Validates a file before upload with detailed error messages
  */
 export function validateMidiFile(file: File): { valid: boolean; message: string } {
 	const allowedExtensions = ['.mid', '.midi'];
@@ -37,7 +37,7 @@ export function validateMidiFile(file: File): { valid: boolean; message: string 
 
 	// Check if file exists
 	if (!file) {
-		return { valid: false, message: 'No file selected' };
+		return { valid: false, message: 'No file selected. Please choose a MIDI file to upload.' };
 	}
 
 	// Check file extension
@@ -45,28 +45,39 @@ export function validateMidiFile(file: File): { valid: boolean; message: string 
 	const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
 
 	if (!hasValidExtension) {
+		const fileExtension = fileName.includes('.') ? fileName.split('.').pop() : 'unknown';
 		return {
 			valid: false,
-			message: 'Please select a valid MIDI file (.mid or .midi)'
+			message: `Invalid file type "${fileExtension}". Please select a MIDI file with .mid or .midi extension.`
 		};
 	}
 
 	// Check file size
 	if (file.size > maxSize) {
+		const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+		const maxSizeMB = (maxSize / (1024 * 1024)).toFixed(0);
 		return {
 			valid: false,
-			message: `File size must be less than ${Math.round(maxSize / 1024)}KB`
+			message: `File size (${fileSizeMB}MB) exceeds the maximum limit of ${maxSizeMB}MB. Please choose a smaller MIDI file.`
 		};
 	}
 
 	if (file.size < minSize) {
 		return {
 			valid: false,
-			message: 'File appears to be empty or corrupted'
+			message: `File appears to be empty (${file.size} bytes). Please select a valid MIDI file with musical content.`
 		};
 	}
 
-	return { valid: true, message: '' };
+	// Additional validation for common non-MIDI files that might have .mid extension
+	if (file.type && !file.type.includes('midi') && !file.type.includes('audio')) {
+		return {
+			valid: false,
+			message: `File type "${file.type}" is not supported. Please select a genuine MIDI file.`
+		};
+	}
+
+	return { valid: true, message: 'File validation successful.' };
 }
 
 /**

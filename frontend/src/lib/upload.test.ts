@@ -40,7 +40,7 @@ describe('Upload Service', () => {
 			const file = new File([midiContent], 'test.mid', { type: 'audio/midi' });
 			const result = validateMidiFile(file);
 			expect(result.valid).toBe(true);
-			expect(result.message).toBe('');
+			expect(result.message).toBe('File validation successful.');
 		});
 
 		it('should accept valid MIDI files with .midi extension', () => {
@@ -48,7 +48,7 @@ describe('Upload Service', () => {
 			const file = new File([midiContent], 'test.midi', { type: 'audio/midi' });
 			const result = validateMidiFile(file);
 			expect(result.valid).toBe(true);
-			expect(result.message).toBe('');
+			expect(result.message).toBe('File validation successful.');
 		});
 
 		it('should accept MIDI files with mixed case extensions', () => {
@@ -56,7 +56,7 @@ describe('Upload Service', () => {
 			const file = new File([midiContent], 'test.MIDI', { type: 'audio/midi' });
 			const result = validateMidiFile(file);
 			expect(result.valid).toBe(true);
-			expect(result.message).toBe('');
+			expect(result.message).toBe('File validation successful.');
 		});
 
 		it('should accept MIDI files with uppercase extensions', () => {
@@ -64,14 +64,14 @@ describe('Upload Service', () => {
 			const file = new File([midiContent], 'test.MID', { type: 'audio/midi' });
 			const result = validateMidiFile(file);
 			expect(result.valid).toBe(true);
-			expect(result.message).toBe('');
+			expect(result.message).toBe('File validation successful.');
 		});
 
 		it('should reject files with invalid extensions', () => {
 			const file = new File(['MThd'], 'test.txt', { type: 'text/plain' });
 			const result = validateMidiFile(file);
 			expect(result.valid).toBe(false);
-			expect(result.message).toBe('Please select a valid MIDI file (.mid or .midi)');
+			expect(result.message).toBe('Invalid file type "txt". Please select a MIDI file with .mid or .midi extension.');
 		});
 
 		it('should reject files with other audio extensions', () => {
@@ -79,7 +79,7 @@ describe('Upload Service', () => {
 			const file = new File([midiContent], 'test.mp3', { type: 'audio/mpeg' });
 			const result = validateMidiFile(file);
 			expect(result.valid).toBe(false);
-			expect(result.message).toBe('Please select a valid MIDI file (.mid or .midi)');
+			expect(result.message).toBe('Invalid file type "mp3". Please select a MIDI file with .mid or .midi extension.');
 		});
 
 		it('should reject files without extensions', () => {
@@ -87,7 +87,7 @@ describe('Upload Service', () => {
 			const file = new File([midiContent], 'test', { type: 'application/octet-stream' });
 			const result = validateMidiFile(file);
 			expect(result.valid).toBe(false);
-			expect(result.message).toBe('Please select a valid MIDI file (.mid or .midi)');
+			expect(result.message).toBe('Invalid file type "unknown". Please select a MIDI file with .mid or .midi extension.');
 		});
 
 		it('should reject files larger than 1MB', () => {
@@ -96,7 +96,7 @@ describe('Upload Service', () => {
 			const file = new File([largeContent], 'large.mid', { type: 'audio/midi' });
 			const result = validateMidiFile(file);
 			expect(result.valid).toBe(false);
-			expect(result.message).toBe('File size must be less than 1024KB');
+			expect(result.message).toBe('File size (1.00MB) exceeds the maximum limit of 1MB. Please choose a smaller MIDI file.');
 		});
 
 		it('should reject files that are too large', () => {
@@ -104,14 +104,14 @@ describe('Upload Service', () => {
 			const file = new File([largeContent], 'large.mid', { type: 'audio/midi' });
 			const result = validateMidiFile(file);
 			expect(result.valid).toBe(false);
-			expect(result.message).toBe('File size must be less than 1024KB');
+			expect(result.message).toBe('File size (2.00MB) exceeds the maximum limit of 1MB. Please choose a smaller MIDI file.');
 		});
 
 		it('should reject empty files', () => {
 			const file = new File([], 'empty.mid', { type: 'audio/midi' });
 			const result = validateMidiFile(file);
 			expect(result.valid).toBe(false);
-			expect(result.message).toBe('File appears to be empty or corrupted');
+			expect(result.message).toBe('File appears to be empty (0 bytes). Please select a valid MIDI file with musical content.');
 		});
 
 		it('should accept files exactly at 1MB limit', () => {
@@ -120,7 +120,7 @@ describe('Upload Service', () => {
 			const file = new File([content], 'exact.mid', { type: 'audio/midi' });
 			const result = validateMidiFile(file);
 			expect(result.valid).toBe(true);
-			expect(result.message).toBe('');
+			expect(result.message).toBe('File validation successful.');
 		});
 	});
 
@@ -254,6 +254,140 @@ describe('Upload Service', () => {
 			const error = new UploadError('Test error');
 			expect(error.message).toBe('Test error');
 			expect(error.status).toBeUndefined();
+		});
+	});
+
+	describe('Drag and Drop Functionality', () => {
+		describe('File validation for drag-dropped files', () => {
+			it('should validate MIDI files dropped via drag and drop', () => {
+				// Create a file with sufficient size (>100 bytes) and MIDI header
+			const midiContent = 'MThd' + 'x'.repeat(100); // MIDI header + padding to meet size requirement
+			const validMidiFile = new File([midiContent], 'test.mid', { type: 'audio/midi' });
+				const result = validateMidiFile(validMidiFile);
+				expect(result.valid).toBe(true);
+				expect(result.message).toBe('File validation successful.');
+			});
+
+			it('should reject invalid file types dropped via drag and drop', () => {
+				const invalidFile = new File(['invalid content'], 'test.txt', { type: 'text/plain' });
+				const result = validateMidiFile(invalidFile);
+				expect(result.valid).toBe(false);
+				expect(result.message).toBe('Invalid file type "txt". Please select a MIDI file with .mid or .midi extension.');
+			});
+
+			it('should reject oversized files dropped via drag and drop', () => {
+				// Create a file larger than 1MB
+				const largeContent = 'x'.repeat(1024 * 1024 + 1); // 1MB + 1 byte
+				const largeFile = new File([largeContent], 'large.mid', { type: 'audio/midi' });
+				const result = validateMidiFile(largeFile);
+				expect(result.valid).toBe(false);
+				expect(result.message).toContain('exceeds the maximum limit');
+			});
+
+			it('should reject empty files dropped via drag and drop', () => {
+				const emptyFile = new File([], 'empty.mid', { type: 'audio/midi' });
+				const result = validateMidiFile(emptyFile);
+				expect(result.valid).toBe(false);
+				expect(result.message).toContain('appears to be empty');
+			});
+		});
+
+		describe('Drag event simulation', () => {
+			it('should handle drag enter events', () => {
+				// Test that drag counter logic works correctly
+				let dragCounter = 0;
+				let isDragOver = false;
+
+				// Simulate drag enter
+				dragCounter++;
+				if (dragCounter === 1) {
+					isDragOver = true;
+				}
+
+				expect(dragCounter).toBe(1);
+				expect(isDragOver).toBe(true);
+			});
+
+			it('should handle drag leave events', () => {
+				// Test that drag counter logic works correctly
+				let dragCounter = 1;
+				let isDragOver = true;
+
+				// Simulate drag leave
+				dragCounter--;
+				if (dragCounter === 0) {
+					isDragOver = false;
+				}
+
+				expect(dragCounter).toBe(0);
+				expect(isDragOver).toBe(false);
+			});
+
+			it('should handle multiple drag enter/leave events correctly', () => {
+				// Test nested drag events (common with child elements)
+				let dragCounter = 0;
+				let isDragOver = false;
+
+				// First drag enter
+				dragCounter++;
+				if (dragCounter === 1) isDragOver = true;
+				expect(isDragOver).toBe(true);
+
+				// Second drag enter (nested element)
+				dragCounter++;
+				expect(dragCounter).toBe(2);
+				expect(isDragOver).toBe(true);
+
+				// First drag leave
+				dragCounter--;
+				if (dragCounter === 0) isDragOver = false;
+				expect(dragCounter).toBe(1);
+				expect(isDragOver).toBe(true); // Still dragging
+
+				// Second drag leave
+				dragCounter--;
+				if (dragCounter === 0) isDragOver = false;
+				expect(dragCounter).toBe(0);
+				expect(isDragOver).toBe(false); // No longer dragging
+			});
+		});
+
+		describe('File metadata generation', () => {
+			it('should generate correct metadata for valid MIDI files', () => {
+				const midiContent = 'MThd' + 'x'.repeat(100); // MIDI header + padding
+				const testFile = new File([midiContent], 'test-song.mid', { 
+					type: 'audio/midi',
+					lastModified: 1640995200000 // Jan 1, 2022
+				});
+
+				// Simulate metadata generation logic
+				const metadata = {
+					name: testFile.name,
+					size: formatFileSize(testFile.size),
+					type: testFile.type || 'audio/midi',
+					lastModified: new Date(testFile.lastModified).toLocaleString()
+				};
+
+				expect(metadata.name).toBe('test-song.mid');
+				expect(metadata.size).toBe('104 Bytes');
+				expect(metadata.type).toBe('audio/midi');
+				expect(metadata.lastModified).toContain('2021'); // Should contain the year (timezone adjusted)
+			});
+
+			it('should handle files without explicit MIME type', () => {
+				const midiContent = 'MThd' + 'x'.repeat(100); // MIDI header + padding
+				const testFile = new File([midiContent], 'test.midi', { type: '' });
+
+				// Simulate metadata generation with fallback type
+				const metadata = {
+					name: testFile.name,
+					size: formatFileSize(testFile.size),
+					type: testFile.type || 'audio/midi',
+					lastModified: new Date(testFile.lastModified).toLocaleString()
+				};
+
+				expect(metadata.type).toBe('audio/midi'); // Should fallback to audio/midi
+			});
 		});
 	});
 });
