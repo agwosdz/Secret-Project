@@ -149,7 +149,27 @@ pip3 install rpi-ws281x
 **Solutions:**
 1. Run with sudo: `sudo python3 script.py`
 2. Add user to gpio group: `sudo usermod -a -G gpio $USER`
-3. Logout and login again
+3. Set proper permissions on gpiomem device: `sudo chmod 666 /dev/gpiomem`
+4. Logout and login again
+
+### Force /dev/gpiomem Usage
+
+This project automatically forces the use of `/dev/gpiomem` instead of `/dev/mem` for safer GPIO access. See `FORCE_GPIOMEM_GUIDE.md` for detailed information.
+
+**Key Benefits:**
+- No root privileges required
+- Safer GPIO access (only GPIO registers, not full system memory)
+- Reduced security risks
+
+**Verification:**
+```bash
+# Check which device is being used
+sudo lsof /dev/gpiomem  # Should show your LED processes
+sudo lsof /dev/mem      # Should be empty or system processes only
+
+# Test with environment variables
+BLINKA_USE_GPIOMEM=1 python3 test_led_device.py --quick
+```
 
 ### Issue: "No module named 'board'" or "No module named 'neopixel'"
 

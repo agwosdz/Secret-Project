@@ -1,10 +1,18 @@
 import logging
+import os
 from typing import Optional
+
+# Force the use of /dev/gpiomem instead of /dev/mem for safer GPIO access
+# This must be set BEFORE importing any GPIO libraries
+os.environ['BLINKA_USE_GPIOMEM'] = '1'
+os.environ['BLINKA_FORCEBOARD'] = 'RASPBERRY_PI_ZERO_2_W'  # Pi Zero 2 W model
+os.environ['BLINKA_FORCECHIP'] = 'BCM2XXX'
 
 try:
     import board
     import neopixel
     HARDWARE_AVAILABLE = True
+    logging.info("Hardware libraries loaded with forced /dev/gpiomem usage")
 except (ImportError, NotImplementedError) as e:
     logging.warning(f"Hardware libraries not available: {e}")
     HARDWARE_AVAILABLE = False
