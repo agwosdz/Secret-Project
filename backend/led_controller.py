@@ -8,6 +8,12 @@ os.environ['BLINKA_USE_GPIOMEM'] = '1'
 os.environ['BLINKA_FORCEBOARD'] = 'RASPBERRY_PI_ZERO_2_W'  # Pi Zero 2 W model
 os.environ['BLINKA_FORCECHIP'] = 'BCM2XXX'
 
+# Additional environment variables to force /dev/gpiomem usage even when running as root
+# These prevent the underlying ws2811 library from trying to use DMA operations
+os.environ['GPIOZERO_PIN_FACTORY'] = 'native'  # Use native GPIO without DMA
+os.environ['WS2811_DMA'] = '0'  # Disable DMA for ws2811 library
+os.environ['WS2811_FORCE_GPIOMEM'] = '1'  # Force gpiomem usage
+
 try:
     import board
     import neopixel
