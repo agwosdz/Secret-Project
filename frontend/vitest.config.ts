@@ -1,10 +1,16 @@
 import { defineConfig } from 'vitest/config';
-import { sveltekit } from '@sveltejs/kit/vite';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 
 export default defineConfig({
-	plugins: [sveltekit()],
+	plugins: [
+		svelte({
+			compilerOptions: {
+				dev: true
+			}
+		})
+	],
 	test: {
-		environment: 'happy-dom',
+		environment: 'jsdom',
 		globals: true,
 		setupFiles: ['./src/test-setup.ts'],
 		include: ['src/**/*.{test,spec}.{js,ts}'],

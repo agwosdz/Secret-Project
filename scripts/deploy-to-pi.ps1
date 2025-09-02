@@ -67,7 +67,7 @@ User=pi
 WorkingDirectory=$PROJECT_DIR/backend
 Environment=PATH=$PROJECT_DIR/backend/venv/bin
 EnvironmentFile=$PROJECT_DIR/.env
-ExecStart=$PROJECT_DIR/backend/venv/bin/python app.py
+ExecStart=$PROJECT_DIR/backend/venv/bin/python start.py
 Restart=always
 RestartSec=10
 
