@@ -1,5 +1,13 @@
 import pytest
 import json
+from unittest.mock import Mock
+import sys
+
+# Mock the hardware modules before importing app
+sys.modules['board'] = Mock()
+sys.modules['neopixel'] = Mock()
+sys.modules['adafruit_circuitpython_neopixel'] = Mock()
+
 from app import app
 
 
