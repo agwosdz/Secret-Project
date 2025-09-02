@@ -309,7 +309,7 @@ def test_pattern():
         
         if pattern == 'rainbow':
             # Create rainbow pattern
-            for i in range(min(LED_COUNT, led_controller.num_pixels)):
+            for i in range(LED_COUNT):
                 hue = (i * 360 // LED_COUNT) % 360
                 rgb = _hue_to_rgb(hue)
                 led_controller.turn_on_led(i, tuple(rgb), auto_show=False)
@@ -1131,7 +1131,7 @@ def handle_test_led(data):
                 })
             else:
                 # Fill all LEDs with color
-                for i in range(min(LED_COUNT, led_controller.num_pixels)):
+                for i in range(LED_COUNT):
                     led_controller.turn_on_led(i, tuple(adjusted_rgb), auto_show=False)
                 led_controller.show()
                 logger.info(f"All LEDs filled with RGB{adjusted_rgb} via WebSocket")
@@ -1175,7 +1175,7 @@ def handle_test_pattern(data):
         # Pattern implementations
         if pattern == 'rainbow':
             # Create rainbow pattern
-            for i in range(min(LED_COUNT, led_controller.num_pixels)):
+            for i in range(LED_COUNT):
                 hue = (i * 360 // LED_COUNT) % 360
                 rgb = _hue_to_rgb(hue)
                 led_controller.turn_on_led(i, tuple(rgb), auto_show=False)
