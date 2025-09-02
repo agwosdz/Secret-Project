@@ -19,7 +19,7 @@ os.environ.setdefault('FLASK_PORT', '5000')
 
 if __name__ == '__main__':
     try:
-        from app import app
+        from app import app, socketio
         print("="*50)
         print("Piano LED Visualizer Backend Starting...")
         print("="*50)
@@ -28,10 +28,12 @@ if __name__ == '__main__':
         print(f"Health Check: http://{app.config['HOST']}:{app.config['PORT']}/health")
         print("="*50)
         
-        app.run(
+        socketio.run(
+            app,
             host=app.config['HOST'],
             port=app.config['PORT'],
-            debug=app.config['DEBUG']
+            debug=app.config['DEBUG'],
+            allow_unsafe_werkzeug=True
         )
     except ImportError as e:
         print(f"Error importing Flask app: {e}")

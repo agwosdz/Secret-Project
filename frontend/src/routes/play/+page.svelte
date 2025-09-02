@@ -61,7 +61,7 @@
 			
 			// Use Socket.IO client if available, otherwise fallback to WebSocket
 			if (typeof io !== 'undefined') {
-				// Socket.IO connection
+				// Socket.IO connection to backend server (use relative path for proxy)
 				websocket = io();
 				
 				websocket.on('connect', () => {
