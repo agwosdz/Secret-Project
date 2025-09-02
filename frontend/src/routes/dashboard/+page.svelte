@@ -12,6 +12,11 @@
 	let lastConnectionTime = null;
 	const maxReconnectAttempts = 5;
 
+	// System status from backend dashboard endpoint
+	let systemStatus = null;
+	let systemStatusLoading = true;
+	let systemStatusError = null;
+
 	// LED state management
 	let ledState = [];
 	let performanceMetrics = {
@@ -42,6 +47,7 @@
 		initializeWebSocket();
 		startPerformanceTracking();
 		startConnectionHealthCheck();
+		fetchSystemStatus();
 	});
 
 	onDestroy(() => {
@@ -207,6 +213,34 @@
 			});
 		}
 	}
+
+	// Fetch system status from backend
+	async function fetchSystemStatus() {
+		try {
+			const response = await fetch('/api/dashboard');
+			if (response.ok) {
+				systemStatus = await response.json();
+				systemStatusError = null;
+			} else {
+				systemStatusError = `HTTP ${response.status}: ${response.statusText}`;
+			}
+		} catch (error) {
+			systemStatusError = 'Cannot connect to backend server';
+		} finally {
+			systemStatusLoading = false;
+		}
+	}
+
+	// Helper functions for system status display
+	function getStatusClass(available) {
+		return available ? 'healthy' : 'error';
+	}
+
+	function formatDuration(seconds) {
+		const mins = Math.floor(seconds / 60);
+		const secs = Math.floor(seconds % 60);
+		return `${mins}:${secs.toString().padStart(2, '0')}`;
+	}
 </script>
 
 <svelte:head>
@@ -280,6 +314,85 @@
 		<section class="performance-section">
 			<h2>Performance Metrics</h2>
 			<PerformanceMonitor {performanceMetrics} />
+		</section>
+
+		<section class="system-status-section">
+			<h2>System Status</h2>
+			{#if systemStatusLoading}
+				<div class="loading">Loading system status...</div>
+			{:else if systemStatusError}
+				<div class="error-card">
+					<span class="error-icon">❌</span>
+					<span class="error-message">{systemStatusError}</span>
+				</div>
+			{:else if systemStatus}
+				<div class="system-status-grid">
+					<div class="status-card">
+						<h3>🔧 Components</h3>
+						<div class="status-items">
+							<div class="status-item">
+								<span class="label">Backend:</span>
+								<span class="status healthy">{systemStatus.system_status.backend_status}</span>
+							</div>
+							<div class="status-item">
+								<span class="label">LED Controller:</span>
+								<span class="status {getStatusClass(systemStatus.system_status.led_controller_available)}">
+									{systemStatus.system_status.led_controller_available ? 'Available' : 'Unavailable'}
+								</span>
+							</div>
+							<div class="status-item">
+								<span class="label">MIDI Parser:</span>
+								<span class="status {getStatusClass(systemStatus.system_status.midi_parser_available)}">
+									{systemStatus.system_status.midi_parser_available ? 'Available' : 'Unavailable'}
+								</span>
+							</div>
+							<div class="status-item">
+								<span class="label">Playback Service:</span>
+								<span class="status {getStatusClass(systemStatus.system_status.playback_service_available)}">
+									{systemStatus.system_status.playback_service_available ? 'Available' : 'Unavailable'}
+								</span>
+							</div>
+						</div>
+						<div class="version">Version: {systemStatus.version}</div>
+					</div>
+
+					{#if systemStatus.playback_status}
+						<div class="status-card">
+							<h3>🎵 Playback</h3>
+							<div class="status-items">
+								<div class="status-item">
+									<span class="label">State:</span>
+									<span class="status {systemStatus.playback_status.state === 'playing' ? 'healthy' : 'neutral'}">
+										{systemStatus.playback_status.state}
+									</span>
+								</div>
+								{#if systemStatus.playback_status.filename}
+									<div class="status-item">
+										<span class="label">File:</span>
+										<span class="filename">{systemStatus.playback_status.filename}</span>
+									</div>
+								{/if}
+								<div class="status-item">
+									<span class="label">Progress:</span>
+									<span class="progress">
+										{formatDuration(systemStatus.playback_status.current_time)} / 
+										{formatDuration(systemStatus.playback_status.total_duration)} 
+										({systemStatus.playback_status.progress_percentage.toFixed(1)}%)
+									</span>
+								</div>
+							</div>
+						</div>
+					{/if}
+
+					<div class="status-card">
+						<h3>📁 Files</h3>
+						<div class="file-count">
+							<span class="count">{systemStatus.uploaded_files_count}</span>
+							<span class="label">MIDI files uploaded</span>
+						</div>
+					</div>
+				</div>
+			{/if}
 		</section>
 	</main>
 </div>

@@ -164,25 +164,35 @@ def check_hardware_connections():
     logger.info("  - Add 1000µF capacitor between power supply +5V and GND (recommended)")
 
 def test_gpio_basic():
-    """Test basic GPIO functionality."""
+    """Test basic GPIO functionality using RPi.GPIO."""
     logger.info("\n=== BASIC GPIO TEST ===")
     
     try:
-        import board
-        logger.info("✓ board module imported successfully")
+        import RPi.GPIO as GPIO
+        logger.info("✓ RPi.GPIO module imported successfully")
         
-        # Test GPIO pin access
-        pin = board.D18
-        logger.info(f"✓ GPIO18 (D18) accessible: {pin}")
+        # Test GPIO setup
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setwarnings(False)
         
-        # List available pins
-        available_pins = [attr for attr in dir(board) if attr.startswith('D')]
-        logger.info(f"Available GPIO pins: {', '.join(available_pins)}")
+        # Test GPIO18 (commonly used for LED strips)
+        test_pin = 18
+        GPIO.setup(test_pin, GPIO.OUT)
+        logger.info(f"✓ GPIO{test_pin} setup successful")
+        
+        # Test basic pin operations
+        GPIO.output(test_pin, GPIO.HIGH)
+        GPIO.output(test_pin, GPIO.LOW)
+        logger.info(f"✓ GPIO{test_pin} output test successful")
+        
+        # Cleanup
+        GPIO.cleanup()
+        logger.info("✓ GPIO cleanup successful")
         
         return True
         
     except ImportError as e:
-        logger.error(f"✗ Cannot import board module: {e}")
+        logger.error(f"✗ Cannot import RPi.GPIO module: {e}")
         return False
     except Exception as e:
         logger.error(f"✗ GPIO test failed: {e}")

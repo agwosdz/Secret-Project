@@ -2,7 +2,7 @@
 # Usage: .\deploy-to-pi.ps1 [pi-ip-address]
 
 param(
-    [string]$PiIP = "192.168.1.228"
+    [string]$PiIP = "192.168.1.225"
 )
 
 $PI_USER = "pi"

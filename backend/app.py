@@ -583,6 +583,60 @@ def get_performance_metrics():
             'message': 'An unexpected error occurred while getting performance metrics'
         }), 500
 
+@app.route('/api/dashboard', methods=['GET'])
+def api_dashboard():
+    """API endpoint providing dashboard data for frontend"""
+    try:
+        # Get system status
+        system_status = {
+            'backend_status': 'running',
+            'led_controller_available': led_controller is not None,
+            'midi_parser_available': midi_parser is not None,
+            'playback_service_available': playback_service is not None
+        }
+        
+        # Get playback status if available
+        playback_status = None
+        if playback_service:
+            try:
+                status = playback_service.get_status()
+                playback_status = {
+                    'state': status.state.value,
+                    'current_time': status.current_time,
+                    'total_duration': status.total_duration,
+                    'progress_percentage': status.progress_percentage,
+                    'filename': status.filename,
+                    'error_message': status.error_message
+                }
+            except Exception as e:
+                logger.warning(f"Error getting playback status for dashboard: {e}")
+        
+        # Get uploaded files count
+        uploaded_files_count = 0
+        try:
+            upload_folder = app.config['UPLOAD_FOLDER']
+            if os.path.exists(upload_folder):
+                uploaded_files_count = len([f for f in os.listdir(upload_folder) 
+                                          if f.lower().endswith(('.mid', '.midi'))])
+        except Exception as e:
+            logger.warning(f"Error counting uploaded files: {e}")
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Piano LED Visualizer Dashboard Data',
+            'version': '1.0.0',
+            'system_status': system_status,
+            'playback_status': playback_status,
+            'uploaded_files_count': uploaded_files_count
+        }), 200
+    
+    except Exception as e:
+        logger.error(f"Error in api_dashboard endpoint: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred while loading dashboard data'
+        }), 500
+
 @app.errorhandler(404)
 def not_found(error):
     """Handle 404 errors"""
