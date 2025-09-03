@@ -56,8 +56,8 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 # Initialize LED controller (with error handling for development without hardware)
 if LEDController:
     try:
-        led_controller = LEDController()
-        logger.info("LED controller initialized successfully")
+        led_controller = LEDController(num_pixels=LED_COUNT)
+        logger.info(f"LED controller initialized successfully with {LED_COUNT} LEDs")
     except Exception as e:
         logger.warning(f"LED controller initialization failed (development mode?): {e}")
         led_controller = None
@@ -101,10 +101,10 @@ def websocket_status_callback(status):
 # Initialize playback service
 if PlaybackService:
     try:
-        playback_service = PlaybackService(led_controller=led_controller, midi_parser=midi_parser)
+        playback_service = PlaybackService(led_controller=led_controller, num_leds=LED_COUNT, midi_parser=midi_parser)
         # Register WebSocket callback for real-time updates
         playback_service.add_status_callback(websocket_status_callback)
-        logger.info("Playback service initialized successfully")
+        logger.info(f"Playback service initialized successfully with {LED_COUNT} LEDs")
     except Exception as e:
         logger.warning(f"Playback service initialization failed: {e}")
         playback_service = None
@@ -184,10 +184,10 @@ def test_led():
             }), 400
             
         # Validate LED index range (allow -1 for Clear All)
-        if led_index != -1 and not (0 <= led_index < led_controller.num_pixels):
+        if led_index != -1 and not (0 <= led_index < LED_COUNT):
             return jsonify({
                 'error': 'Bad Request',
-                'message': f'LED index must be between 0 and {led_controller.num_pixels - 1}, or -1 for all LEDs'
+                'message': f'LED index must be between 0 and {LED_COUNT - 1}, or -1 for all LEDs'
             }), 400
         
         # Validate state
