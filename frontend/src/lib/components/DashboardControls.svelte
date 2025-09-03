@@ -399,6 +399,8 @@
 
 	.control-group {
 		margin-bottom: 1rem;
+		display: flex;
+		align-items: center;
 	}
 
 	.control-group:last-child {
@@ -406,7 +408,8 @@
 	}
 
 	.control-group label {
-		display: block;
+		display: inline-block;
+		width: 120px;
 		margin-bottom: 0.5rem;
 		font-weight: 500;
 		color: #555;
@@ -414,7 +417,7 @@
 	}
 
 	.number-input {
-		width: 100%;
+		width: calc(100% - 120px);
 		padding: 0.75rem; /* Larger touch targets */
 		border: 1px solid #ccc;
 		border-radius: 6px;
@@ -424,7 +427,7 @@
 	}
 
 	.pattern-select {
-		width: 100%;
+		width: calc(100% - 120px);
 		padding: 0.75rem; /* Larger touch targets */
 		border: 1px solid #ccc;
 		border-radius: 6px;
@@ -443,6 +446,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.75rem; /* Larger gaps for touch */
+		width: calc(100% - 120px);
 	}
 
 	.color-input {
@@ -469,6 +473,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
+		width: calc(100% - 120px);
 	}
 
 	.rgb-input {
@@ -529,6 +534,7 @@
 		align-items: center;
 		gap: 0.75rem;
 		min-height: 44px;
+		width: calc(100% - 120px);
 	}
 
 	.brightness-slider {
@@ -678,6 +684,24 @@
 		
 		.control-section {
 			padding: 0.75rem;
+		}
+		
+		.control-group {
+			flex-direction: column;
+			align-items: flex-start;
+		}
+		
+		.control-group label {
+			width: 100%;
+			margin-bottom: 0.5rem;
+		}
+		
+		.number-input,
+		.pattern-select,
+		.color-controls,
+		.rgb-controls,
+		.brightness-control {
+			width: 100%;
 		}
 		
 		.preset-colors {
