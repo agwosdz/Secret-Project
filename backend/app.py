@@ -1322,7 +1322,7 @@ def _hue_to_rgb(hue):
 @socketio.on('led_count_change')
 def handle_led_count_change(data):
     """Handle LED count configuration change"""
-    global LED_COUNT
+    global LED_COUNT, led_controller, playback_service
     
     try:
         new_led_count = int(data.get('ledCount', LED_COUNT))
@@ -1335,6 +1335,31 @@ def handle_led_count_change(data):
         # Update global LED count
         LED_COUNT = new_led_count
         logger.info(f"LED count updated to: {LED_COUNT}")
+        
+        # Reinitialize LED controller with new count
+        if LEDController:
+            try:
+                if led_controller:
+                    # Clean up existing controller
+                    led_controller.clear_all()
+                led_controller = LEDController(num_pixels=LED_COUNT)
+                logger.info(f"LED controller reinitialized with {LED_COUNT} LEDs")
+            except Exception as e:
+                logger.warning(f"LED controller reinitialization failed: {e}")
+                led_controller = None
+        
+        # Reinitialize playback service with new LED count
+        if PlaybackService and midi_parser:
+            try:
+                if playback_service:
+                    # Stop any ongoing playback
+                    playback_service.stop()
+                playback_service = PlaybackService(led_controller=led_controller, num_leds=LED_COUNT, midi_parser=midi_parser)
+                playback_service.add_status_callback(websocket_status_callback)
+                logger.info(f"Playback service reinitialized with {LED_COUNT} LEDs")
+            except Exception as e:
+                logger.warning(f"Playback service reinitialization failed: {e}")
+                playback_service = None
         
         # Emit confirmation to all clients
         socketio.emit('led_count_updated', {

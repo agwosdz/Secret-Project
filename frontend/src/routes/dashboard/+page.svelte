@@ -86,10 +86,19 @@
 				});
 				
 				websocket.on('led_update', (data) => {
-					updateLEDState(data);
-				});
-				
-				websocket.on('disconnect', (reason) => {
+				updateLEDState(data);
+			});
+			
+			websocket.on('led_count_updated', (data) => {
+				console.log('LED count updated:', data);
+				// Update local LED count if different
+				if (data.ledCount && data.ledCount !== ledCount) {
+					ledCount = data.ledCount;
+					initializeLEDState(ledCount);
+				}
+			});
+			
+			websocket.on('disconnect', (reason) => {
 					console.log('Dashboard WebSocket disconnected:', reason);
 					connectionStatus = 'disconnected';
 					connectionError = `Disconnected: ${reason}`;

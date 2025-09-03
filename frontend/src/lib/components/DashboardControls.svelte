@@ -414,7 +414,7 @@
 	}
 
 	.number-input {
-		width: 120px;
+		width: 100%;
 		padding: 0.75rem; /* Larger touch targets */
 		border: 1px solid #ccc;
 		border-radius: 6px;
