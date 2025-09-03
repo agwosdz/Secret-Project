@@ -22,7 +22,7 @@
 
 	// LED state management
 	let ledState = [];
-	let ledCount = 150; // Default LED count, configurable
+	let ledCount = 246; // Default LED count, configurable
 	let performanceMetrics = {
 		update_frequency: 0,
 		latency_ms: 0,

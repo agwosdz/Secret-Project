@@ -12,7 +12,7 @@
 	let selectedBrightness = 0.8;
 	let testPattern = 'rainbow';
 	let patternDuration = 5000;
-	let ledCount = 150; // Default LED count
+	let ledCount = 246; // Default LED count
 
 	// Available test patterns
 	const patterns = [
