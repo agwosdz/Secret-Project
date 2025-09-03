@@ -58,6 +58,14 @@
 
 	// Handle LED count change
 	function handleLEDCountChange() {
+		// Validate LED count (1-300 range)
+		const maxLEDCount = 300;
+		if (ledCount < 1) {
+			ledCount = 1;
+		} else if (ledCount > maxLEDCount) {
+			ledCount = maxLEDCount;
+		}
+		
 		// Ensure selected LED index is within bounds
 		if (selectedLEDIndex >= ledCount) {
 			selectedLEDIndex = Math.max(0, ledCount - 1);
@@ -186,14 +194,15 @@
 		<div class="control-group">
 			<label for="led-index">LED Index:</label>
 			<input 
-				id="led-index"
-				type="number" 
-				bind:value={selectedLEDIndex} 
-				min="0" 
-				max={ledCount - 1}
-				disabled={!isConnected}
-				class="number-input"
-			/>
+			id="led-index"
+			type="number" 
+			bind:value={selectedLEDIndex} 
+			min="0" 
+			max={ledCount - 1}
+			disabled={!isConnected}
+			class="number-input"
+			on:change={testLED}
+		/>
 		</div>
 
 		<div class="control-group">

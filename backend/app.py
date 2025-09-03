@@ -47,8 +47,16 @@ app.config['PORT'] = int(os.environ.get('FLASK_PORT', 5001))
 app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024  # 1MB max file size
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
 
-# LED Configuration
-LED_COUNT = int(os.environ.get('LED_COUNT', 150))  # Default 150 LEDs, configurable via environment or WebSocket
+# Import configuration module
+try:
+    from config import load_config, update_config, get_config
+    # Load LED count from configuration
+    LED_COUNT = get_config('led_count', int(os.environ.get('LED_COUNT', 150)))
+    logger.info(f"Loaded LED count from configuration: {LED_COUNT}")
+except ImportError as e:
+    logger.warning(f"Configuration module import failed: {e}")
+    # Fallback to environment variable
+    LED_COUNT = int(os.environ.get('LED_COUNT', 150))
 
 # Create upload directory if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -1332,16 +1340,23 @@ def handle_led_count_change(data):
             emit('error', {'message': f'Invalid LED count: {new_led_count}. Valid range: 1-300'})
             return
             
-        # Update global LED count
+        # Update global LED count and save to configuration
         LED_COUNT = new_led_count
         logger.info(f"LED count updated to: {LED_COUNT}")
+        
+        # Save to configuration if available
+        try:
+            update_config('led_count', LED_COUNT)
+            logger.info(f"Saved LED count {LED_COUNT} to configuration")
+        except Exception as e:
+            logger.warning(f"Failed to save LED count to configuration: {e}")
         
         # Reinitialize LED controller with new count
         if LEDController:
             try:
-#                 if led_controller:
-                    # Clean up existing controller
-#                    led_controller.turn_off_all() 
+                if led_controller:
+                    # Turn off all LEDs but don't destroy the controller
+                    led_controller.turn_off_all() 
                 led_controller = LEDController(num_pixels=LED_COUNT)
                 logger.info(f"LED controller reinitialized with {LED_COUNT} LEDs")
             except Exception as e:
@@ -1360,6 +1375,26 @@ def handle_led_count_change(data):
             except Exception as e:
                 logger.warning(f"Playback service reinitialization failed: {e}")
                 playback_service = None
+        
+        # Light up LEDs incrementally to provide visual feedback
+        if led_controller:
+            try:
+                # Turn off all LEDs first
+                led_controller.turn_off_all()
+                
+                # Default color for visualization
+                color = (0, 128, 255)  # Blue color
+                brightness = 0.5
+                
+                # Light up LEDs incrementally
+                for i in range(LED_COUNT):
+                    led_controller.turn_on_led(i, color, brightness)
+                    # Small delay for visual effect
+                    socketio.sleep(0.01)
+                
+                logger.info(f"Illuminated {LED_COUNT} LEDs for visual feedback")
+            except Exception as e:
+                logger.warning(f"Failed to provide visual LED count feedback: {e}")
         
         # Emit confirmation to all clients
         socketio.emit('led_count_updated', {
