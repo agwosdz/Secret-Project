@@ -1341,7 +1341,7 @@ def handle_led_count_change(data):
             try:
                 if led_controller:
                     # Clean up existing controller
-                    led_controller.clear_all()
+                    led_controller.cleanup()
                 led_controller = LEDController(num_pixels=LED_COUNT)
                 logger.info(f"LED controller reinitialized with {LED_COUNT} LEDs")
             except Exception as e:
