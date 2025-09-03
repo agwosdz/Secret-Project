@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Default configuration values
 DEFAULT_CONFIG = {
-    "led_count": 150,  # Default LED count
+    "led_count": 246,  # Default LED count
     "max_led_count": 300,  # Maximum allowed LED count
     "brightness": 0.5,  # Default brightness
     "pin": 18,  # Default GPIO pin

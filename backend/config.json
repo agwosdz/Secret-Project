@@ -1,5 +1,5 @@
 {
-    "led_count": 150,
+    "led_count": 246,
     "max_led_count": 300,
     "brightness": 0.5,
     "pin": 18

@@ -51,12 +51,12 @@ app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__fil
 try:
     from config import load_config, update_config, get_config
     # Load LED count from configuration
-    LED_COUNT = get_config('led_count', int(os.environ.get('LED_COUNT', 150)))
+    LED_COUNT = get_config('led_count', int(os.environ.get('LED_COUNT', 246)))
     logger.info(f"Loaded LED count from configuration: {LED_COUNT}")
 except ImportError as e:
     logger.warning(f"Configuration module import failed: {e}")
     # Fallback to environment variable
-    LED_COUNT = int(os.environ.get('LED_COUNT', 150))
+    LED_COUNT = int(os.environ.get('LED_COUNT', 246))
 
 # Create upload directory if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
