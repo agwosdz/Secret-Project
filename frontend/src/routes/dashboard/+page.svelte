@@ -3,6 +3,9 @@
 	import LEDVisualization from '$lib/components/LEDVisualization.svelte';
 	import DashboardControls from '$lib/components/DashboardControls.svelte';
 	import PerformanceMonitor from '$lib/components/PerformanceMonitor.svelte';
+	
+	// Visualization toggle
+	let visualizationEnabled = true;
 
 	// WebSocket connection for real-time LED updates
 	let websocket = null;
@@ -354,33 +357,26 @@
 		</div>
 	</header>
 
-	<main class="dashboard-main">
-		<section class="visualization-section">
+	<section class="visualization-section-full-width">
+		<div class="visualization-header">
 			<h2>LED Strip Visualization</h2>
+			<label class="toggle-switch">
+				<input type="checkbox" bind:checked={visualizationEnabled}>
+				<span class="toggle-slider"></span>
+				<span class="toggle-label">{visualizationEnabled ? 'Enabled' : 'Disabled'}</span>
+			</label>
+		</div>
+		{#if visualizationEnabled}
 			<LEDVisualization 
 				{ledState} 
-				width={800} 
+				width={1200} 
 				height={200}
 				responsive={true}
 			/>
-		</section>
+		{/if}
+	</section>
 
-		<section class="controls-section">
-			<h2>Manual Controls</h2>
-			<DashboardControls 
-				{connectionStatus}
-				on:ledTest={handleLEDTest}
-				on:patternTest={handlePatternTest}
-				on:testAll={handleTestAll}
-				on:ledCountChange={handleLEDCountChange}
-			/>
-		</section>
-
-		<section class="performance-section">
-			<h2>Performance Metrics</h2>
-			<PerformanceMonitor {performanceMetrics} />
-		</section>
-
+	<main class="dashboard-main">
 		<section class="system-status-section">
 			<h2>System Status</h2>
 			{#if systemStatusLoading}
@@ -458,6 +454,22 @@
 					</div>
 				</div>
 			{/if}
+		</section>
+
+		<section class="controls-section">
+			<h2>Manual Controls</h2>
+			<DashboardControls 
+				{connectionStatus}
+				on:ledTest={handleLEDTest}
+				on:patternTest={handlePatternTest}
+				on:testAll={handleTestAll}
+				on:ledCountChange={handleLEDCountChange}
+			/>
+		</section>
+
+		<section class="performance-section">
+			<h2>Performance Metrics</h2>
+			<PerformanceMonitor {performanceMetrics} />
 		</section>
 	</main>
 </div>
@@ -852,16 +864,90 @@
 		}
 	}
 
+		/* Visualization toggle switch */
+	.visualization-section-full-width {
+		background: white;
+		border-radius: 12px;
+		padding: 1.5rem;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+		border: 1px solid #e0e0e0;
+		margin-bottom: 2rem;
+	}
+	
+	.visualization-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 1rem;
+	}
+	
+	.visualization-header h2 {
+		margin: 0;
+		color: #333;
+		font-size: 1.25rem;
+		font-weight: 600;
+	}
+	
+	.toggle-switch {
+		display: flex;
+		align-items: center;
+		cursor: pointer;
+	}
+	
+	.toggle-switch input {
+		opacity: 0;
+		width: 0;
+		height: 0;
+	}
+	
+	.toggle-slider {
+		position: relative;
+		display: inline-block;
+		width: 50px;
+		height: 24px;
+		background-color: #ccc;
+		border-radius: 24px;
+		transition: .4s;
+		margin-right: 10px;
+	}
+	
+	.toggle-slider:before {
+		position: absolute;
+		content: "";
+		height: 18px;
+		width: 18px;
+		left: 3px;
+		bottom: 3px;
+		background-color: white;
+		border-radius: 50%;
+		transition: .4s;
+	}
+	
+	.toggle-switch input:checked + .toggle-slider {
+		background-color: #4caf50;
+	}
+	
+	.toggle-switch input:checked + .toggle-slider:before {
+		transform: translateX(26px);
+	}
+	
+	.toggle-label {
+		font-size: 0.9rem;
+		font-weight: 500;
+		color: #555;
+		min-width: 60px;
+	}
+
 	@media (min-width: 768px) {
 		.dashboard-main {
-			grid-template-columns: 2fr 1fr;
+			grid-template-columns: 1fr 1fr;
 			grid-template-areas: 
-				"visualization controls"
-				"performance system-status";
+				"system-status controls"
+				"performance performance";
 		}
 
-		.visualization-section {
-			grid-area: visualization;
+		.system-status-section {
+			grid-area: system-status;
 		}
 
 		.controls-section {
@@ -871,18 +957,13 @@
 		.performance-section {
 			grid-area: performance;
 		}
-
-		.system-status-section {
-			grid-area: system-status;
-		}
 	}
 
 	@media (min-width: 1024px) {
 		.dashboard-main {
-			grid-template-columns: 2fr 1fr 1fr;
+			grid-template-columns: 1fr 1fr 1fr;
 			grid-template-areas: 
-				"visualization controls performance"
-				"visualization system-status system-status";
+				"system-status controls performance";
 		}
 	}
 </style>
