@@ -98,6 +98,21 @@
 		}
 	}
 
+	// Helper function for rounded rectangle (polyfill for older browsers)
+	function drawRoundedRect(ctx, x, y, width, height, radius) {
+		ctx.beginPath();
+		ctx.moveTo(x + radius, y);
+		ctx.lineTo(x + width - radius, y);
+		ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+		ctx.lineTo(x + width, y + height - radius);
+		ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+		ctx.lineTo(x + radius, y + height);
+		ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+		ctx.lineTo(x, y + radius);
+		ctx.quadraticCurveTo(x, y, x + radius, y);
+		ctx.closePath();
+	}
+
 	function renderLEDs() {
 		if (!ctx || !ledState.length) return;
 
@@ -113,7 +128,13 @@
 
 		// Render background strip
 		ctx.fillStyle = '#1a1a1a';
-		ctx.roundRect(ledSpacing / 2, ledY - ledSize / 2 - 5, availableWidth + ledSpacing, ledSize + 10, 5);
+		if (ctx.roundRect) {
+			// Use native roundRect if available
+			ctx.roundRect(ledSpacing / 2, ledY - ledSize / 2 - 5, availableWidth + ledSpacing, ledSize + 10, 5);
+		} else {
+			// Use polyfill for older browsers
+			drawRoundedRect(ctx, ledSpacing / 2, ledY - ledSize / 2 - 5, availableWidth + ledSpacing, ledSize + 10, 5);
+		}
 		ctx.fill();
 
 		// Render individual LEDs

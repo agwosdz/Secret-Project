@@ -209,7 +209,7 @@ def test_led():
                     color = (255, 255, 255)
                 
                 # Fill all LEDs
-                for i in range(led_controller.num_pixels):
+                for i in range(LED_COUNT):
                     led_controller.turn_on_led(i, color, auto_show=False)
                 led_controller.show()
                 
@@ -321,14 +321,14 @@ def test_pattern():
                     for brightness in range(0, 256, 8):  # Fade in
                         factor = brightness / 255.0
                         pulse_color = (int(base_color[0] * factor), int(base_color[1] * factor), int(base_color[2] * factor))
-                        for i in range(led_controller.num_pixels):
+                        for i in range(LED_COUNT):
                             led_controller.turn_on_led(i, pulse_color, auto_show=False)
                         led_controller.show()
                         time.sleep(0.02)
                     for brightness in range(255, -1, -8):  # Fade out
                         factor = brightness / 255.0
                         pulse_color = (int(base_color[0] * factor), int(base_color[1] * factor), int(base_color[2] * factor))
-                        for i in range(led_controller.num_pixels):
+                        for i in range(LED_COUNT):
                             led_controller.turn_on_led(i, pulse_color, auto_show=False)
                         led_controller.show()
                         time.sleep(0.02)
@@ -340,14 +340,14 @@ def test_pattern():
             def chase_effect():
                 try:
                     chase_length = 5  # Number of LEDs in chase
-                    for offset in range(led_controller.num_pixels + chase_length):
+                    for offset in range(LED_COUNT + chase_length):
                         # Clear all LEDs
-                        for i in range(led_controller.num_pixels):
+                        for i in range(LED_COUNT):
                             led_controller.turn_on_led(i, (0, 0, 0), auto_show=False)
                         # Set chase LEDs
                         for i in range(chase_length):
-                            led_pos = (offset - i) % led_controller.num_pixels
-                            if 0 <= led_pos < led_controller.num_pixels:
+                            led_pos = (offset - i) % LED_COUNT
+                            if 0 <= led_pos < LED_COUNT:
                                 brightness = 1.0 - (i / chase_length)
                                 chase_color = (int(base_color[0] * brightness), int(base_color[1] * brightness), int(base_color[2] * brightness))
                                 led_controller.turn_on_led(led_pos, chase_color, auto_show=False)
@@ -362,12 +362,12 @@ def test_pattern():
                 try:
                     for _ in range(20):  # 20 flashes
                         # Flash on
-                        for i in range(led_controller.num_pixels):
+                        for i in range(LED_COUNT):
                             led_controller.turn_on_led(i, base_color, auto_show=False)
                         led_controller.show()
                         time.sleep(0.05)
                         # Flash off
-                        for i in range(led_controller.num_pixels):
+                        for i in range(LED_COUNT):
                             led_controller.turn_on_led(i, (0, 0, 0), auto_show=False)
                         led_controller.show()
                         time.sleep(0.05)
@@ -382,7 +382,7 @@ def test_pattern():
                     for brightness in range(0, 256, 4):
                         factor = brightness / 255.0
                         fade_color = (int(base_color[0] * factor), int(base_color[1] * factor), int(base_color[2] * factor))
-                        for i in range(led_controller.num_pixels):
+                        for i in range(LED_COUNT):
                             led_controller.turn_on_led(i, fade_color, auto_show=False)
                         led_controller.show()
                         time.sleep(0.03)
@@ -391,7 +391,7 @@ def test_pattern():
                     for brightness in range(255, -1, -4):
                         factor = brightness / 255.0
                         fade_color = (int(base_color[0] * factor), int(base_color[1] * factor), int(base_color[2] * factor))
-                        for i in range(led_controller.num_pixels):
+                        for i in range(LED_COUNT):
                             led_controller.turn_on_led(i, fade_color, auto_show=False)
                         led_controller.show()
                         time.sleep(0.03)
@@ -400,7 +400,7 @@ def test_pattern():
             threading.Thread(target=fade_effect, daemon=True).start()
         elif pattern == 'solid':
             # Solid color fill
-            for i in range(led_controller.num_pixels):
+            for i in range(LED_COUNT):
                 led_controller.turn_on_led(i, base_color, auto_show=False)
             led_controller.show()
         elif pattern in ['red', 'green', 'blue', 'white']:
@@ -412,7 +412,7 @@ def test_pattern():
                 'white': (255, 255, 255)
             }
             pattern_color = color_map[pattern]
-            for i in range(led_controller.num_pixels):
+            for i in range(LED_COUNT):
                 led_controller.turn_on_led(i, pattern_color, auto_show=False)
             led_controller.show()
         else:
@@ -1189,14 +1189,14 @@ def handle_test_pattern(data):
                     for brightness in range(0, 256, 8):  # Fade in
                         factor = brightness / 255.0
                         pulse_color = (int(base_color[0] * factor), int(base_color[1] * factor), int(base_color[2] * factor))
-                        for i in range(led_controller.num_pixels):
+                        for i in range(LED_COUNT):
                             led_controller.turn_on_led(i, pulse_color, auto_show=False)
                         led_controller.show()
                         time.sleep(0.02)
                     for brightness in range(255, -1, -8):  # Fade out
                         factor = brightness / 255.0
                         pulse_color = (int(base_color[0] * factor), int(base_color[1] * factor), int(base_color[2] * factor))
-                        for i in range(led_controller.num_pixels):
+                        for i in range(LED_COUNT):
                             led_controller.turn_on_led(i, pulse_color, auto_show=False)
                         led_controller.show()
                         time.sleep(0.02)
@@ -1210,14 +1210,14 @@ def handle_test_pattern(data):
             def chase_effect():
                 try:
                     chase_length = 5  # Number of LEDs in chase
-                    for offset in range(led_controller.num_pixels + chase_length):
+                    for offset in range(LED_COUNT + chase_length):
                         # Clear all LEDs
-                        for i in range(led_controller.num_pixels):
+                        for i in range(LED_COUNT):
                             led_controller.turn_on_led(i, (0, 0, 0), auto_show=False)
                         # Set chase LEDs
                         for i in range(chase_length):
-                            led_pos = (offset - i) % led_controller.num_pixels
-                            if 0 <= led_pos < led_controller.num_pixels:
+                            led_pos = (offset - i) % LED_COUNT
+                            if 0 <= led_pos < LED_COUNT:
                                 brightness = 1.0 - (i / chase_length)
                                 chase_color = (int(base_color[0] * brightness), int(base_color[1] * brightness), int(base_color[2] * brightness))
                                 led_controller.turn_on_led(led_pos, chase_color, auto_show=False)
@@ -1234,12 +1234,12 @@ def handle_test_pattern(data):
                 try:
                     for _ in range(20):  # 20 flashes
                         # Flash on
-                        for i in range(led_controller.num_pixels):
+                        for i in range(LED_COUNT):
                             led_controller.turn_on_led(i, base_color, auto_show=False)
                         led_controller.show()
                         time.sleep(0.05)
                         # Flash off
-                        for i in range(led_controller.num_pixels):
+                        for i in range(LED_COUNT):
                             led_controller.turn_on_led(i, (0, 0, 0), auto_show=False)
                         led_controller.show()
                         time.sleep(0.05)
@@ -1256,7 +1256,7 @@ def handle_test_pattern(data):
                     for brightness in range(0, 256, 4):
                         factor = brightness / 255.0
                         fade_color = (int(base_color[0] * factor), int(base_color[1] * factor), int(base_color[2] * factor))
-                        for i in range(led_controller.num_pixels):
+                        for i in range(LED_COUNT):
                             led_controller.turn_on_led(i, fade_color, auto_show=False)
                         led_controller.show()
                         time.sleep(0.03)
@@ -1265,7 +1265,7 @@ def handle_test_pattern(data):
                     for brightness in range(255, -1, -4):
                         factor = brightness / 255.0
                         fade_color = (int(base_color[0] * factor), int(base_color[1] * factor), int(base_color[2] * factor))
-                        for i in range(led_controller.num_pixels):
+                        for i in range(LED_COUNT):
                             led_controller.turn_on_led(i, fade_color, auto_show=False)
                         led_controller.show()
                         time.sleep(0.03)
@@ -1274,27 +1274,27 @@ def handle_test_pattern(data):
             threading.Thread(target=fade_effect, daemon=True).start()
         elif pattern == 'solid':
             # Solid color fill
-            for i in range(led_controller.num_pixels):
+            for i in range(LED_COUNT):
                 led_controller.turn_on_led(i, base_color, auto_show=False)
             led_controller.show()
         elif pattern == 'red':
             # Fill all LEDs with red
-            for i in range(led_controller.num_pixels):
+            for i in range(LED_COUNT):
                 led_controller.turn_on_led(i, (255, 0, 0), auto_show=False)
             led_controller.show()
         elif pattern == 'green':
             # Fill all LEDs with green
-            for i in range(led_controller.num_pixels):
+            for i in range(LED_COUNT):
                 led_controller.turn_on_led(i, (0, 255, 0), auto_show=False)
             led_controller.show()
         elif pattern == 'blue':
             # Fill all LEDs with blue
-            for i in range(led_controller.num_pixels):
+            for i in range(LED_COUNT):
                 led_controller.turn_on_led(i, (0, 0, 255), auto_show=False)
             led_controller.show()
         elif pattern == 'white':
             # Fill all LEDs with white
-            for i in range(led_controller.num_pixels):
+            for i in range(LED_COUNT):
                 led_controller.turn_on_led(i, (255, 255, 255), auto_show=False)
             led_controller.show()
         else:

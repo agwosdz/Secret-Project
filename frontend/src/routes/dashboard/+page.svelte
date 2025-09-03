@@ -610,6 +610,123 @@
 		50% { opacity: 0.5; }
 	}
 
+	/* System Status Styles */
+	.system-status-grid {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 1rem;
+	}
+
+	.status-card {
+		padding: 1rem;
+		border: 1px solid #e0e0e0;
+		border-radius: 8px;
+		background: #fafafa;
+	}
+
+	.status-card h3 {
+		margin: 0 0 0.75rem 0;
+		font-size: 1rem;
+		font-weight: 600;
+		color: #333;
+	}
+
+	.status-items {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.status-item {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.25rem 0;
+	}
+
+	.status-item .label {
+		font-weight: 500;
+		color: #555;
+	}
+
+	.status-item .status {
+		padding: 0.25rem 0.5rem;
+		border-radius: 4px;
+		font-size: 0.85rem;
+		font-weight: 500;
+	}
+
+	.status.healthy {
+		background-color: #e8f5e8;
+		color: #2d5a2d;
+	}
+
+	.status.error {
+		background-color: #ffeaea;
+		color: #d32f2f;
+	}
+
+	.status.neutral {
+		background-color: #f0f0f0;
+		color: #666;
+	}
+
+	.version {
+		margin-top: 0.75rem;
+		font-size: 0.85rem;
+		color: #666;
+		font-style: italic;
+	}
+
+	.filename {
+		font-family: monospace;
+		background: #f0f0f0;
+		padding: 0.25rem 0.5rem;
+		border-radius: 4px;
+		font-size: 0.85rem;
+	}
+
+	.progress {
+		font-family: monospace;
+		font-size: 0.85rem;
+	}
+
+	.file-count {
+		text-align: center;
+		padding: 1rem;
+	}
+
+	.file-count .count {
+		display: block;
+		font-size: 2rem;
+		font-weight: bold;
+		color: #007bff;
+		margin-bottom: 0.25rem;
+	}
+
+	.file-count .label {
+		font-size: 0.9rem;
+		color: #666;
+	}
+
+	.loading {
+		text-align: center;
+		padding: 2rem;
+		color: #666;
+		font-style: italic;
+	}
+
+	.error-card {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 1rem;
+		background-color: #ffeaea;
+		color: #d32f2f;
+		border: 1px solid #f5c6cb;
+		border-radius: 8px;
+	}
+
 	.dashboard-main {
 		display: grid;
 		grid-template-columns: 1fr;
@@ -618,7 +735,8 @@
 
 	.visualization-section,
 	.controls-section,
-	.performance-section {
+	.performance-section,
+	.system-status-section {
 		background: white;
 		border-radius: 12px;
 		padding: 1.5rem;
@@ -628,7 +746,8 @@
 
 	.visualization-section h2,
 	.controls-section h2,
-	.performance-section h2 {
+	.performance-section h2,
+	.system-status-section h2 {
 		margin: 0 0 1rem 0;
 		color: #333;
 		font-size: 1.25rem;
@@ -729,7 +848,7 @@
 			grid-template-columns: 2fr 1fr;
 			grid-template-areas: 
 				"visualization controls"
-				"performance performance";
+				"performance system-status";
 		}
 
 		.visualization-section {
@@ -743,13 +862,18 @@
 		.performance-section {
 			grid-area: performance;
 		}
+
+		.system-status-section {
+			grid-area: system-status;
+		}
 	}
 
 	@media (min-width: 1024px) {
 		.dashboard-main {
 			grid-template-columns: 2fr 1fr 1fr;
 			grid-template-areas: 
-				"visualization controls performance";
+				"visualization controls performance"
+				"visualization system-status system-status";
 		}
 	}
 </style>

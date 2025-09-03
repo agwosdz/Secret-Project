@@ -69,31 +69,8 @@
 		});
 	}
 
-	// Test individual LED
-	function testLED() {
-		if (connectionStatus !== 'connected') return;
-		
-		dispatch('ledTest', {
-			ledIndex: selectedLEDIndex,
-			color: selectedColor,
-			brightness: selectedBrightness
-		});
-	}
-
-	// Test pattern
-	function runTestPattern() {
-		if (connectionStatus !== 'connected') return;
-		
-		dispatch('patternTest', {
-			pattern: testPattern,
-			duration: patternDuration
-		});
-	}
-
-	// Clear all LEDs
-	function clearAllLEDs() {
-		if (connectionStatus !== 'connected') return;
-		
+	// Helper function to clear all LEDs
+	function clearLEDs() {
 		dispatch('ledTest', {
 			ledIndex: -1, // -1 indicates all LEDs
 			color: { r: 0, g: 0, b: 0 },
@@ -101,27 +78,79 @@
 		});
 	}
 
+	// Test individual LED
+	function testLED() {
+		if (connectionStatus !== 'connected') return;
+		
+		// Clear LEDs before testing
+		clearLEDs();
+		
+		// Wait a moment then test the LED
+		setTimeout(() => {
+			dispatch('ledTest', {
+				ledIndex: selectedLEDIndex,
+				color: selectedColor,
+				brightness: selectedBrightness
+			});
+		}, 100);
+	}
+
+	// Test pattern
+	function runTestPattern() {
+		if (connectionStatus !== 'connected') return;
+		
+		// Clear LEDs before running pattern
+		clearLEDs();
+		
+		// Wait a moment then run pattern
+		setTimeout(() => {
+			dispatch('patternTest', {
+				pattern: testPattern,
+				duration: patternDuration
+			});
+		}, 100);
+	}
+
+	// Clear all LEDs
+	function clearAllLEDs() {
+		if (connectionStatus !== 'connected') return;
+		
+		clearLEDs();
+	}
+
 	// Fill all LEDs with current color
 	function fillAllLEDs() {
 		if (connectionStatus !== 'connected') return;
 		
-		dispatch('ledTest', {
-			ledIndex: -1, // -1 indicates all LEDs
-			color: selectedColor,
-			brightness: selectedBrightness
-		});
+		// Clear LEDs before filling
+		clearLEDs();
+		
+		// Wait a moment then fill
+		setTimeout(() => {
+			dispatch('ledTest', {
+				ledIndex: -1, // -1 indicates all LEDs
+				color: selectedColor,
+				brightness: selectedBrightness
+			});
+		}, 100);
 	}
 
 	// Test all LEDs sequentially
 	function testAllLEDs() {
 		if (connectionStatus !== 'connected') return;
 		
-		dispatch('testAll', {
-			color: selectedColor,
-			brightness: selectedBrightness,
-			delay: 100, // 100ms delay between each LED
-			ledCount: ledCount // Pass the current LED count
-		});
+		// Clear LEDs before testing all
+		clearLEDs();
+		
+		// Wait a moment then start test sequence
+		setTimeout(() => {
+			dispatch('testAll', {
+				color: selectedColor,
+				brightness: selectedBrightness,
+				delay: 100, // 100ms delay between each LED
+				ledCount: ledCount // Pass the current LED count
+			});
+		}, 100);
 	}
 
 	$: isConnected = connectionStatus === 'connected';
@@ -384,7 +413,16 @@
 		font-size: 0.9rem;
 	}
 
-	.number-input,
+	.number-input {
+		width: 120px;
+		padding: 0.75rem; /* Larger touch targets */
+		border: 1px solid #ccc;
+		border-radius: 6px;
+		font-size: 1rem; /* Prevent zoom on iOS */
+		min-height: 44px; /* Minimum touch target size */
+		touch-action: manipulation;
+	}
+
 	.pattern-select {
 		width: 100%;
 		padding: 0.75rem; /* Larger touch targets */
