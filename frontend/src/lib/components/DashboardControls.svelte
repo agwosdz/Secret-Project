@@ -71,6 +71,26 @@
 			selectedLEDIndex = Math.max(0, ledCount - 1);
 		}
 		
+		// Provide visual feedback by illuminating LEDs incrementally
+		if (connectionStatus === 'connected') {
+			// Clear all LEDs first
+			dispatch('ledTest', {
+				ledIndex: -1, // -1 indicates all LEDs
+				color: { r: 0, g: 0, b: 0 },
+				brightness: 0
+			});
+			
+			// Illuminate LEDs incrementally to show the new count
+			setTimeout(() => {
+				dispatch('testAll', {
+					color: { r: 0, g: 255, b: 0 }, // Green for visual feedback
+					brightness: 0.8,
+					delay: 10, // Fast illumination
+					ledCount: ledCount
+				});
+			}, 100);
+		}
+		
 		// Dispatch LED count change to parent
 		dispatch('ledCountChange', {
 			ledCount: ledCount
@@ -179,16 +199,21 @@
 		
 		<div class="control-group">
 			<label for="led-count">LED Count:</label>
-			<input 
-				id="led-count"
-				type="number" 
-				bind:value={ledCount} 
-				min="1" 
-				max="300"
-				disabled={!isConnected}
-				class="number-input"
-				on:input={handleLEDCountChange}
-			/>
+			<div class="led-count-container">
+				<input 
+					id="led-count"
+					type="number" 
+					bind:value={ledCount} 
+					min="1" 
+					max="300"
+					disabled={!isConnected}
+					class="number-input {ledCount > 300 ? 'invalid' : ''}"
+					on:input={handleLEDCountChange}
+				/>
+				{#if ledCount > 300}
+					<div class="validation-error">Maximum 300 LEDs allowed</div>
+				{/if}
+			</div>
 		</div>
 
 		<div class="control-group">
@@ -201,6 +226,16 @@
 			max={ledCount - 1}
 			disabled={!isConnected}
 			class="number-input"
+			on:input={() => {
+				if (isConnected) {
+					// Automatically illuminate the selected LED when adjusting the index
+					dispatch('ledTest', {
+						ledIndex: selectedLEDIndex,
+						color: selectedColor,
+						brightness: selectedBrightness
+					});
+				}
+			}}
 			on:change={testLED}
 		/>
 		</div>
@@ -425,6 +460,20 @@
 		font-size: 0.9rem;
 	}
 
+	.led-count-container {
+		position: relative;
+		width: calc(100% - 120px);
+	}
+
+	.validation-error {
+		position: absolute;
+		top: 100%;
+		left: 0;
+		color: #ff3e00;
+		font-size: 0.8rem;
+		margin-top: 0.25rem;
+	}
+
 	.number-input {
 		width: calc(100% - 120px);
 		padding: 0.75rem; /* Larger touch targets */
@@ -433,6 +482,11 @@
 		font-size: 1rem; /* Prevent zoom on iOS */
 		min-height: 44px; /* Minimum touch target size */
 		touch-action: manipulation;
+	}
+
+	.number-input.invalid {
+		border-color: #ff3e00;
+		background-color: rgba(255, 62, 0, 0.05);
 	}
 
 	.pattern-select {
