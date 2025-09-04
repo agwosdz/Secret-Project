@@ -57,6 +57,9 @@
 		startPerformanceTracking();
 		startConnectionHealthCheck();
 		fetchSystemStatus();
+		
+		// Fetch saved LED count from backend settings
+		fetchLEDCount();
 	});
 
 	onDestroy(() => {
@@ -244,6 +247,32 @@
 				websocket.emit('led_count_change', {
 					ledCount: ledCount
 				});
+				
+				// Provide visual feedback by illuminating LEDs incrementally
+				// First clear all LEDs
+				websocket.emit('test_led', {
+					index: -1, // -1 indicates all LEDs
+					r: 0,
+					g: 0,
+					b: 0,
+					brightness: 0
+				});
+				
+				// Then illuminate LEDs incrementally to show the new count
+				setTimeout(() => {
+					// Test each LED sequentially with a delay
+					for (let i = 0; i < ledCount; i++) {
+						setTimeout(() => {
+							websocket.emit('test_led', {
+								index: i,
+								r: 0,
+								g: 255,
+								b: 0,
+								brightness: 0.8
+							});
+						}, i * 10); // Fast illumination
+					}
+				}, 100);
 			}
 		}
 	}
@@ -294,6 +323,25 @@
 			systemStatusError = 'Cannot connect to backend server';
 		} finally {
 			systemStatusLoading = false;
+		}
+	}
+	
+	// Fetch saved LED count from backend settings
+	async function fetchLEDCount() {
+		try {
+			const response = await fetch('/api/settings/led_count');
+			if (response.ok) {
+				const data = await response.json();
+				if (data.led_count && data.led_count !== ledCount) {
+					ledCount = data.led_count;
+					initializeLEDState(ledCount);
+					console.log(`Retrieved LED count from settings: ${ledCount}`);
+				}
+			} else {
+				console.warn(`Failed to fetch LED count: ${response.status}`);
+			}
+		} catch (error) {
+			console.warn(`Error fetching LED count: ${error.message}`);
 		}
 	}
 

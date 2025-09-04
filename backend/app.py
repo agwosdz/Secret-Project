@@ -996,6 +996,20 @@ def get_performance_metrics():
             'message': 'An unexpected error occurred while getting performance metrics'
         }), 500
 
+@app.route('/api/settings/led_count', methods=['GET'])
+def get_led_count():
+    """Get the current LED count from settings"""
+    try:
+        return jsonify({
+            'led_count': LED_COUNT
+        }), 200
+    except Exception as e:
+        logger.error(f"Error getting LED count: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred while getting LED count'
+        }), 500
+
 @app.route('/api/dashboard', methods=['GET'])
 def api_dashboard():
     """API endpoint providing dashboard data for frontend"""

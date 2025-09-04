@@ -71,26 +71,6 @@
 			selectedLEDIndex = Math.max(0, ledCount - 1);
 		}
 		
-		// Provide visual feedback by illuminating LEDs incrementally
-		if (connectionStatus === 'connected') {
-			// Clear all LEDs first
-			dispatch('ledTest', {
-				ledIndex: -1, // -1 indicates all LEDs
-				color: { r: 0, g: 0, b: 0 },
-				brightness: 0
-			});
-			
-			// Illuminate LEDs incrementally to show the new count
-			setTimeout(() => {
-				dispatch('testAll', {
-					color: { r: 0, g: 255, b: 0 }, // Green for visual feedback
-					brightness: 0.8,
-					delay: 10, // Fast illumination
-					ledCount: ledCount
-				});
-			}, 100);
-		}
-		
 		// Dispatch LED count change to parent
 		dispatch('ledCountChange', {
 			ledCount: ledCount
