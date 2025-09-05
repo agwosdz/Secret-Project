@@ -442,20 +442,36 @@ import { onMount } from 'svelte';
 <div class="upload-container">
 	{#if shouldShowTooltips}
 		<Tooltip text="Use Ctrl+Z/Ctrl+Y or these buttons to undo/redo actions" position="left" delay={tooltipDelay}>
-	{/if}
+			<UndoRedoControls 
+				on:undo={(event) => restoreState(event.detail.state, `Undid: ${event.detail.description}`)}
+				on:redo={(event) => restoreState(event.detail.state, `Redid: ${event.detail.description}`)}
+			/>
+		</Tooltip>
+	{:else}
 		<UndoRedoControls 
 			on:undo={(event) => restoreState(event.detail.state, `Undid: ${event.detail.description}`)}
 			on:redo={(event) => restoreState(event.detail.state, `Redid: ${event.detail.description}`)}
 		/>
-	{#if shouldShowTooltips}
-		</Tooltip>
 	{/if}
 
 	<!-- Preferences Button -->
 	<div class="preferences-button-container">
 		{#if shouldShowTooltips}
 			<Tooltip text="Open preferences to customize upload settings" position="left" delay={tooltipDelay}>
-		{/if}
+				<InteractiveButton
+					variant="ghost"
+					size="small"
+					class="preferences-btn"
+					on:click={openPreferences}
+					aria-label="Open preferences"
+				>
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" class="preferences-icon">
+						<circle cx="12" cy="12" r="3"/>
+						<path d="M12 1v6m0 6v6m11-7h-6m-6 0H1m17-4a4 4 0 0 1-8 0 4 4 0 0 1 8 0zM7 21a4 4 0 0 1-8 0 4 4 0 0 1 8 0z"/>
+					</svg>
+				</InteractiveButton>
+			</Tooltip>
+		{:else}
 			<InteractiveButton
 				variant="ghost"
 				size="small"
@@ -468,8 +484,6 @@ import { onMount } from 'svelte';
 					<path d="M12 1v6m0 6v6m11-7h-6m-6 0H1m17-4a4 4 0 0 1-8 0 4 4 0 0 1 8 0zM7 21a4 4 0 0 1-8 0 4 4 0 0 1 8 0z"/>
 				</svg>
 			</InteractiveButton>
-		{#if shouldShowTooltips}
-			</Tooltip>
 		{/if}
 	</div>
 	<!-- Status Display -->
@@ -483,8 +497,7 @@ import { onMount } from 'svelte';
 
 		<div class="upload-section">
 			{#if shouldShowTooltips}
-				<Tooltip text="Click to browse or drag and drop MIDI files (.mid, .midi)" position="bottom" delay={tooltipDelay}>
-			{/if}
+			<Tooltip text="Click to browse or drag and drop MIDI files (.mid, .midi)" position="bottom" delay={tooltipDelay}>
 				<div 
 					bind:this={dropZone}
 					class="drop-zone interactive" 
@@ -565,9 +578,89 @@ import { onMount } from 'svelte';
 					</div>
 				{/if}
 				</div>
-			{#if shouldShowTooltips}
-				</Tooltip>
+			</Tooltip>
+		{:else}
+			<div 
+				bind:this={dropZone}
+				class="drop-zone interactive" 
+				class:drag-over={isDragOver}
+				class:has-file={selectedFile}
+				class:disabled={uploadStatus === 'uploading'}
+				on:dragenter={handleDragEnter}
+				on:dragleave={handleDragLeave}
+				on:dragover={handleDragOver}
+				on:drop={handleDrop}
+				on:click={() => fileInput.click()}
+				on:keydown={(e) => {
+					if (e.key === 'Enter' || e.key === ' ') {
+						e.preventDefault();
+						fileInput.click();
+					}
+				}}
+				role="button"
+				aria-label="Click to select MIDI file or drag and drop"
+				aria-describedby="drop-zone-help"
+				tabindex="0"
+			>
+			<div class="file-input-wrapper">
+				<SmartInput
+					bind:this={fileInput}
+					type="file"
+					accept=".mid,.midi"
+					id="midi-file"
+					label="MIDI File"
+					placeholder="Choose a MIDI file to upload"
+					validationOptions={fileValidationOptions}
+					errorPrevention={fileUploadPrevention}
+					disabled={uploadStatus === 'uploading'}
+					required
+					helpText="Supported formats: .mid, .midi (max 1MB)"
+					on:validation={handleSmartValidation}
+					on:change={handleSmartFileChange}
+					aria-label="Select MIDI file"
+					aria-describedby="file-input-help"
+					class="smart-file-input"
+				/>
+				
+				<!-- Hidden help text for screen readers -->
+				<div id="drop-zone-help" class="sr-only">
+					Select a MIDI file by clicking this area or dragging and dropping a file. Supported formats: .mid, .midi
+				</div>
+				<div id="file-input-help" class="sr-only">
+					Choose a MIDI file from your computer. Only .mid and .midi files are accepted.
+				</div>
+				<label for="midi-file" class="file-label" class:disabled={uploadStatus === 'uploading'}>
+					<svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+						<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+						<polyline points="7,10 12,15 17,10" />
+						<line x1="12" y1="15" x2="12" y2="3" />
+					</svg>
+					<span class="upload-text">
+						{#if isDragOver}
+							Drop MIDI file here
+						{:else if selectedFile}
+							{selectedFile.name}
+						{:else}
+							Drag & drop MIDI file or click to browse
+						{/if}
+					</span>
+				</label>
+			</div>
+			
+			{#if isDragOver}
+				<div class="drag-overlay">
+					<div class="drag-indicator">
+						<svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+							<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+							<polyline points="7,10 12,15 17,10" />
+							<line x1="12" y1="15" x2="12" y2="3" />
+						</svg>
+						<p>Drop your MIDI file here</p>
+					</div>
+				</div>
 			{/if}
+			</div>
+		{/if}
 
 			{#if fileMetadata}
 			<section class="file-metadata card-interactive" role="region" aria-labelledby="file-preview-title">
@@ -604,8 +697,7 @@ import { onMount } from 'svelte';
 			<div class="upload-actions" role="group" aria-labelledby="upload-actions-title">
 				<h3 id="upload-actions-title" class="sr-only">Upload Actions</h3>
 				{#if shouldShowTooltips}
-					<Tooltip text={selectedFile ? 'Upload your MIDI file for LED visualization' : 'Select a MIDI file first'} position="top" delay={tooltipDelay}>
-				{/if}
+				<Tooltip text={selectedFile ? 'Upload your MIDI file for LED visualization' : 'Select a MIDI file first'} position="top" delay={tooltipDelay}>
 					<InteractiveButton 
 						variant="primary"
 						size="large"
@@ -617,9 +709,20 @@ import { onMount } from 'svelte';
 					>
 						{uploadStatus === 'uploading' ? 'Uploading...' : 'Upload File'}
 					</InteractiveButton>
-				{#if shouldShowTooltips}
-					</Tooltip>
-				{/if}
+				</Tooltip>
+			{:else}
+				<InteractiveButton 
+					variant="primary"
+					size="large"
+					disabled={!selectedFile || uploadStatus === 'uploading'}
+					loading={uploadStatus === 'uploading'}
+					class="upload-btn"
+					on:click={handleUpload}
+					aria-describedby={selectedFile ? 'file-preview-title' : undefined}
+				>
+					{uploadStatus === 'uploading' ? 'Uploading...' : 'Upload File'}
+				</InteractiveButton>
+			{/if}
 
 				{#if uploadStatus === 'uploading'}
 					<div class="progress-section">
@@ -636,15 +739,25 @@ import { onMount } from 'svelte';
 
 				{#if uploadStatus === 'success'}
 					{#if shouldShowTooltips}
-						<Tooltip text="Start the LED visualization with your uploaded MIDI file" position="top" delay={tooltipDelay}>
-					{/if}
+					<Tooltip text="Start the LED visualization with your uploaded MIDI file" position="top" delay={tooltipDelay}>
 						<a href="/play" class="play-btn" role="button" aria-label="Navigate to play page to start LED visualization">Play Song</a>
-					{#if shouldShowTooltips}
-						</Tooltip>
-					{/if}
+					</Tooltip>
+				{:else}
+					<a href="/play" class="play-btn" role="button" aria-label="Navigate to play page to start LED visualization">Play Song</a>
+				{/if}
 					{#if shouldShowTooltips}
 						<Tooltip text="Upload another MIDI file" position="top" delay={tooltipDelay}>
-					{/if}
+							<InteractiveButton 
+								variant="ghost"
+								size="medium"
+								class="reset-btn"
+								aria-label="Reset form to upload another MIDI file"
+								on:click={resetUpload}
+							>
+								Upload Another
+							</InteractiveButton>
+						</Tooltip>
+					{:else}
 						<InteractiveButton 
 							variant="ghost"
 							size="medium"
@@ -654,13 +767,10 @@ import { onMount } from 'svelte';
 						>
 							Upload Another
 						</InteractiveButton>
-					{#if shouldShowTooltips}
-						</Tooltip>
 					{/if}
 				{:else if uploadStatus === 'error'}
 					{#if shouldShowTooltips}
-						<Tooltip text="Clear the error and try uploading again" position="top" delay={tooltipDelay}>
-					{/if}
+					<Tooltip text="Clear the error and try uploading again" position="top" delay={tooltipDelay}>
 						<InteractiveButton 
 							variant="ghost"
 							size="medium"
@@ -670,9 +780,18 @@ import { onMount } from 'svelte';
 						>
 							Try Again
 						</InteractiveButton>
-					{#if shouldShowTooltips}
-						</Tooltip>
-					{/if}
+					</Tooltip>
+				{:else}
+					<InteractiveButton 
+						variant="ghost"
+						size="medium"
+						class="reset-btn"
+						aria-label="Clear error and reset form to try uploading again"
+						on:click={resetUpload}
+					>
+						Try Again
+					</InteractiveButton>
+				{/if}
 				{/if}
 			</div>
 		</div>

@@ -813,7 +813,7 @@
 		border: 1px solid #e0e0e0;
 	}
 
-	.visualization-section h2,
+	.visualization-section-full-width h2,
 	.controls-section h2,
 	.performance-section h2,
 	.system-status-section h2 {
@@ -881,14 +881,6 @@
 		}
 
 		/* Improve touch targets for controls */
-		.visualization-toggle {
-			min-height: 44px;
-		}
-
-		.visualization-toggle label {
-			padding: 0.75rem;
-		}
-
 		.control-button {
 			min-height: 44px;
 			padding: 0.75rem 1rem;

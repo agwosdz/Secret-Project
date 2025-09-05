@@ -524,6 +524,39 @@
 		handleSeek(currentTime);
 	}
 
+	function handleTimelineKeydown(event: KeyboardEvent) {
+		const step = totalDuration * 0.01; // 1% of total duration
+		let newTime = currentTime;
+		
+		switch (event.key) {
+			case 'ArrowLeft':
+				event.preventDefault();
+				newTime = Math.max(0, currentTime - step);
+				break;
+			case 'ArrowRight':
+				event.preventDefault();
+				newTime = Math.min(totalDuration, currentTime + step);
+				break;
+			case 'Home':
+				event.preventDefault();
+				newTime = 0;
+				break;
+			case 'End':
+				event.preventDefault();
+				newTime = totalDuration;
+				break;
+			case ' ':
+			case 'Enter':
+				event.preventDefault();
+				togglePlayback();
+				return;
+			default:
+				return;
+		}
+		
+		handleSeek(newTime);
+	}
+
 	function formatTime(seconds: number): string {
 		const mins = Math.floor(seconds / 60);
 		const secs = Math.floor(seconds % 60);
@@ -607,23 +640,25 @@
 					<span class="total-time">{formatTime(totalDuration)}</span>
 				</div>
 				<div 
-					class="timeline" 
-					bind:this={timelineElement}
-					on:click={handleTimelineClick}
-					on:mousedown={handleTimelineDragStart}
-					on:mousemove={handleTimelineDrag}
-					on:mouseup={handleTimelineDragEnd}
-					on:mouseleave={handleTimelineDragEnd}
-					on:touchstart={handleTimelineDragStart}
-					on:touchmove={handleTimelineDrag}
-					on:touchend={handleTimelineDragEnd}
-					on:touchcancel={handleTimelineDragEnd}
+				class="timeline" 
+				bind:this={timelineElement}
+				role="slider"
+				tabindex="0"
+				aria-label="Timeline scrubber"
+				aria-valuemin="0"
+				aria-valuemax={totalDuration}
+				aria-valuenow={currentTime}
+				on:click={handleTimelineClick}
+				on:keydown={handleTimelineKeydown}
+				on:mousedown={handleTimelineDragStart}
+				on:mousemove={handleTimelineDrag}
+				on:mouseup={handleTimelineDragEnd}
+				on:mouseleave={handleTimelineDragEnd}
+				on:touchstart={handleTimelineDragStart}
+				on:touchmove={handleTimelineDrag}
+				on:touchend={handleTimelineDragEnd}
+				on:touchcancel={handleTimelineDragEnd}
 					class:dragging={isDragging}
-					aria-label="Playback timeline. Use slider to seek through the song."
-					role="slider"
-					aria-valuemin="0"
-					aria-valuemax="{totalDuration}"
-					aria-valuenow="{currentTime}"
 					aria-valuetext="{formatTime(currentTime)}"
 				>
 					<div class="timeline-track">
