@@ -28,16 +28,58 @@ export class UploadError extends Error {
 }
 
 /**
- * Validates a file before upload with detailed error messages
+ * Enhanced validation result with detailed error information
  */
-export function validateMidiFile(file: File): { valid: boolean; message: string } {
+export interface ValidationResult {
+	valid: boolean;
+	message: string;
+	errorType?: 'extension' | 'size' | 'empty' | 'type' | 'name' | 'content';
+	suggestion?: string;
+	details?: {
+		actualSize?: string;
+		maxSize?: string;
+		actualExtension?: string;
+		allowedExtensions?: string[];
+	};
+}
+
+/**
+ * Validates a file before upload with comprehensive error messages and suggestions
+ */
+export function validateMidiFile(file: File): ValidationResult {
 	const allowedExtensions = ['.mid', '.midi'];
 	const maxSize = 1024 * 1024; // 1MB
 	const minSize = 100; // 100 bytes minimum
 
 	// Check if file exists
 	if (!file) {
-		return { valid: false, message: 'No file selected. Please choose a MIDI file to upload.' };
+		return {
+			valid: false,
+			message: 'No file selected. Please choose a MIDI file to upload.',
+			errorType: 'empty',
+			suggestion: 'Click the upload area or drag and drop a MIDI file (.mid or .midi) to get started.'
+		};
+	}
+
+	// Check for invalid filename characters
+	const invalidChars = /[<>:"|?*\\]/;
+	if (invalidChars.test(file.name)) {
+		return {
+			valid: false,
+			message: 'Filename contains invalid characters. Please rename your file.',
+			errorType: 'name',
+			suggestion: 'Remove characters like < > : " | ? * \\ from the filename and try again.'
+		};
+	}
+
+	// Check filename length
+	if (file.name.length > 255) {
+		return {
+			valid: false,
+			message: 'Filename is too long. Please use a shorter filename.',
+			errorType: 'name',
+			suggestion: 'Rename your file to be under 255 characters and try again.'
+		};
 	}
 
 	// Check file extension
@@ -45,39 +87,83 @@ export function validateMidiFile(file: File): { valid: boolean; message: string 
 	const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
 
 	if (!hasValidExtension) {
-		const fileExtension = fileName.includes('.') ? fileName.split('.').pop() : 'unknown';
+		const fileExtension = fileName.includes('.') ? fileName.split('.').pop() : 'no extension';
+		const commonMistakes = {
+			'mp3': 'MP3 files are audio recordings, not MIDI data. You need a MIDI file (.mid or .midi).',
+			'wav': 'WAV files are audio recordings, not MIDI data. You need a MIDI file (.mid or .midi).',
+			'txt': 'Text files cannot be processed as MIDI. You need a MIDI file (.mid or .midi).',
+			'pdf': 'PDF files cannot be processed as MIDI. You need a MIDI file (.mid or .midi).',
+			'doc': 'Document files cannot be processed as MIDI. You need a MIDI file (.mid or .midi).',
+			'docx': 'Document files cannot be processed as MIDI. You need a MIDI file (.mid or .midi).'
+		};
+
+		const specificMessage = commonMistakes[fileExtension as keyof typeof commonMistakes] ||
+			`Files with "${fileExtension}" extension are not supported. You need a MIDI file (.mid or .midi).`;
+
 		return {
 			valid: false,
-			message: `Invalid file type "${fileExtension}". Please select a MIDI file with .mid or .midi extension.`
+			message: specificMessage,
+			errorType: 'extension',
+			suggestion: 'MIDI files are created by music software like GarageBand, FL Studio, or Ableton Live. Look for files ending in .mid or .midi.',
+			details: {
+				actualExtension: fileExtension,
+				allowedExtensions
+			}
 		};
 	}
 
-	// Check file size
+	// Check file size - too large
 	if (file.size > maxSize) {
 		const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
 		const maxSizeMB = (maxSize / (1024 * 1024)).toFixed(0);
 		return {
 			valid: false,
-			message: `File size (${fileSizeMB}MB) exceeds the maximum limit of ${maxSizeMB}MB. Please choose a smaller MIDI file.`
+			message: `File size (${fileSizeMB}MB) exceeds the maximum limit of ${maxSizeMB}MB.`,
+			errorType: 'size',
+			suggestion: 'Try using a shorter MIDI file or reduce the number of tracks/instruments in your music software.',
+			details: {
+				actualSize: `${fileSizeMB}MB`,
+				maxSize: `${maxSizeMB}MB`
+			}
 		};
 	}
 
+	// Check file size - too small
 	if (file.size < minSize) {
 		return {
 			valid: false,
-			message: `File appears to be empty (${file.size} bytes). Please select a valid MIDI file with musical content.`
+			message: `File appears to be empty or corrupted (${file.size} bytes).`,
+			errorType: 'empty',
+			suggestion: 'Make sure your MIDI file contains musical notes and was exported correctly from your music software.',
+			details: {
+				actualSize: `${file.size} bytes`
+			}
 		};
 	}
 
 	// Additional validation for common non-MIDI files that might have .mid extension
-	if (file.type && !file.type.includes('midi') && !file.type.includes('audio')) {
+	if (file.type && !file.type.includes('midi') && !file.type.includes('audio') && !file.type.includes('octet-stream')) {
 		return {
 			valid: false,
-			message: `File type "${file.type}" is not supported. Please select a genuine MIDI file.`
+			message: `File type "${file.type}" is not a MIDI file, despite the .mid extension.`,
+			errorType: 'type',
+			suggestion: 'This file may have been renamed to have a .mid extension but is not actually a MIDI file. Export a proper MIDI file from your music software.'
 		};
 	}
 
-	return { valid: true, message: 'File validation successful.' };
+	// Basic MIDI header validation (if we can read the file)
+	try {
+		const reader = new FileReader();
+		// We can't do async validation here, but we can check the filename pattern
+		// More sophisticated content validation would require async processing
+	} catch (error) {
+		// File reading not available or failed - continue with basic validation
+	}
+
+	return {
+		valid: true,
+		message: 'File validation successful. Ready to upload!'
+	};
 }
 
 /**

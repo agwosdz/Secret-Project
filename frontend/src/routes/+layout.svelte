@@ -1,6 +1,8 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
 	import MobileNavigation from '$lib/components/MobileNavigation.svelte';
+	import ToastContainer from '$lib/components/ToastContainer.svelte';
+	import '$lib/styles/global.css';
 
 	let { children } = $props();
 </script>
@@ -16,6 +18,9 @@
 		{@render children?.()}
 	</main>
 </div>
+
+<!-- Global Toast Container -->
+<ToastContainer />
 
 <style>
 	.app-container {
