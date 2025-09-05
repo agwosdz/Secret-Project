@@ -9,11 +9,9 @@ import UndoRedoControls from '$lib/components/UndoRedoControls.svelte';
 import Tooltip from '$lib/components/Tooltip.svelte';
 import OnboardingTour from '$lib/components/OnboardingTour.svelte';
 import PreferencesModal from '$lib/components/PreferencesModal.svelte';
-import ValidationMessage from '$lib/components/ValidationMessage.svelte';
-import SmartInput from '$lib/components/SmartInput.svelte';
+
 import StatusDisplay from '$lib/components/StatusDisplay.svelte';
-import { createFileUploadPrevention } from '$lib/errorPrevention';
-import { VALIDATION_PRESETS } from '$lib/validation';
+
 import { statusManager, statusUtils } from '$lib/statusCommunication';
 import { helpActions, shouldShowOnboarding, setupHelpKeyboardShortcuts } from '$lib/stores/helpStore.js';
 import { uploadPreferences, uiPreferences, preferenceActions, preferenceUtils } from '$lib/stores/preferencesStore.js';
@@ -30,20 +28,9 @@ import { onMount } from 'svelte';
 	let showOnboardingTour = false;
 	let helpKeyboardCleanup = null;
 	let showPreferencesModal = false;
-	let validationResult: ValidationResult | null = null;
 	
-	// Smart input configuration
-	const { manager: fileUploadPrevention, tips: fileUploadTips } = createFileUploadPrevention({
-		showPreventiveTips: true,
-		showRealTimeValidation: true,
-		debounceMs: 300
-	});
 	
-	const fileValidationOptions = {
-		rules: VALIDATION_PRESETS.file('1MB', ['mid', 'midi']),
-		field: 'MIDI file',
-		showSuggestions: true
-	};
+
 	
 	// Preference variables
 	$: uploadPrefs = $uploadPreferences;
@@ -79,6 +66,24 @@ import { onMount } from 'svelte';
 			return;
 		}
 
+		// Validate file type
+		if (!file.name.toLowerCase().match(/\.(mid|midi)$/)) {
+			uploadMessage = 'Only .mid and .midi files are supported';
+			uploadStatus = 'error';
+			return;
+		}
+		
+		// Validate file size (1MB limit)
+		if (file.size > 1024 * 1024) {
+			uploadMessage = 'File size must be less than 1MB';
+			uploadStatus = 'error';
+			return;
+		}
+
+		// Clear any previous error states
+		uploadMessage = '';
+		uploadStatus = 'idle';
+
 		// Remember last directory if preference is enabled
 		if (uploadPrefs?.rememberLastDirectory && file.webkitRelativePath) {
 			preferenceActions.update('upload', 'lastDirectory', file.webkitRelativePath);
@@ -92,37 +97,13 @@ import { onMount } from 'svelte';
 		}
 	}
 
-	// Handler for SmartInput validation
-	function handleSmartValidation(event: CustomEvent) {
-		const { detail } = event;
-		validationResult = detail;
-		
-		// If validation passes, process the file
-		if (detail && detail.valid && selectedFile) {
-			uploadMessage = '';
-			uploadStatus = 'idle';
-			statusUtils.validationSuccess(selectedFile.name);
-		} else if (detail && !detail.valid) {
-			uploadMessage = detail.message;
-			uploadStatus = 'error';
-			// Don't show status message for validation errors as they're handled by ValidationMessage component
-		}
-	}
-	
-	// Handler for SmartInput file change
-	function handleSmartFileChange(event: CustomEvent) {
-		const { detail } = event;
-		if (detail.value instanceof File) {
-			selectedFile = detail.value;
-			// Remember last directory if preference is enabled
-			if (uploadPrefs?.rememberLastDirectory && detail.value.webkitRelativePath) {
-				preferenceActions.update('upload', 'lastDirectory', detail.value.webkitRelativePath);
-			}
-			processSelectedFile(detail.value);
-		} else {
-			selectedFile = null;
-			fileMetadata = null;
-		}
+	// Format file size for display
+	function formatFileSize(bytes: number): string {
+		if (bytes === 0) return '0 Bytes';
+		const k = 1024;
+		const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+		const i = Math.floor(Math.log(bytes) / Math.log(k));
+		return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 	}
 
 	// Process a selected file (common logic for click and drag-drop)
@@ -206,6 +187,25 @@ import { onMount } from 'svelte';
 		const files = event.dataTransfer?.files;
 		if (files && files.length > 0) {
 			const file = files[0];
+			
+			// Validate file type
+			if (!file.name.toLowerCase().match(/\.(mid|midi)$/)) {
+				uploadMessage = 'Only .mid and .midi files are supported';
+				uploadStatus = 'error';
+				return;
+			}
+			
+			// Validate file size (1MB limit)
+			if (file.size > 1024 * 1024) {
+				uploadMessage = 'File size must be less than 1MB';
+				uploadStatus = 'error';
+				return;
+			}
+			
+			// Clear any previous error states
+			uploadMessage = '';
+			uploadStatus = 'idle';
+			
 			processSelectedFile(file);
 			
 			// Save state after drag and drop
@@ -496,6 +496,17 @@ import { onMount } from 'svelte';
 		</p>
 
 		<div class="upload-section">
+			<!-- Hidden file input -->
+			<input 
+				bind:this={fileInput}
+				type="file"
+				accept=".mid,.midi"
+				id="midi-file"
+				on:change={handleFileSelect}
+				class="sr-only"
+				aria-label="Select MIDI file"
+			/>
+
 			{#if shouldShowTooltips}
 			<Tooltip text="Click to browse or drag and drop MIDI files (.mid, .midi)" position="bottom" delay={tooltipDelay}>
 				<div 
@@ -520,63 +531,42 @@ import { onMount } from 'svelte';
 					aria-describedby="drop-zone-help"
 					tabindex="0"
 				>
-				<div class="file-input-wrapper">
-					<SmartInput
-						bind:this={fileInput}
-						type="file"
-						accept=".mid,.midi"
-						id="midi-file"
-						label="MIDI File"
-						placeholder="Choose a MIDI file to upload"
-						validationOptions={fileValidationOptions}
-						errorPrevention={fileUploadPrevention}
-						disabled={uploadStatus === 'uploading'}
-						required
-						helpText="Supported formats: .mid, .midi (max 1MB)"
-						on:validation={handleSmartValidation}
-						on:change={handleSmartFileChange}
-						aria-label="Select MIDI file"
-						aria-describedby="file-input-help"
-						class="smart-file-input"
-					/>
-					
 					<!-- Hidden help text for screen readers -->
 					<div id="drop-zone-help" class="sr-only">
-						Select a MIDI file by clicking this area or dragging and dropping a file. Supported formats: .mid, .midi
+						Select a MIDI file by clicking this area or dragging and dropping a file. Supported formats: .mid, .midi (max 1MB)
 					</div>
-					<div id="file-input-help" class="sr-only">
-						Choose a MIDI file from your computer. Only .mid and .midi files are accepted.
-					</div>
-					<label for="midi-file" class="file-label" class:disabled={uploadStatus === 'uploading'}>
-						<svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+					
+					<div class="drop-zone-content">
+						<svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
 							<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
 							<polyline points="7,10 12,15 17,10" />
 							<line x1="12" y1="15" x2="12" y2="3" />
 						</svg>
-						<span class="upload-text">
+						<div class="upload-text">
 							{#if isDragOver}
-								Drop MIDI file here
+								<h3>Drop MIDI file here</h3>
 							{:else if selectedFile}
-								{selectedFile.name}
+								<h3>{selectedFile.name}</h3>
+								<p class="file-size">{formatFileSize(selectedFile.size)}</p>
 							{:else}
-								Drag & drop MIDI file or click to browse
+								<h3>Drag & drop MIDI file or click to browse</h3>
+								<p class="supported-formats">Supported formats: .mid, .midi (max 1MB)</p>
 							{/if}
-						</span>
-					</label>
-				</div>
-				
-				{#if isDragOver}
-					<div class="drag-overlay">
-						<div class="drag-indicator">
-							<svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-								<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-								<polyline points="7,10 12,15 17,10" />
-								<line x1="12" y1="15" x2="12" y2="3" />
-							</svg>
-							<p>Drop your MIDI file here</p>
 						</div>
 					</div>
-				{/if}
+					
+					{#if isDragOver}
+						<div class="drag-overlay">
+							<div class="drag-indicator">
+								<svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+									<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+									<polyline points="7,10 12,15 17,10" />
+									<line x1="12" y1="15" x2="12" y2="3" />
+								</svg>
+								<p>Drop your MIDI file here</p>
+							</div>
+						</div>
+					{/if}
 				</div>
 			</Tooltip>
 		{:else}
@@ -602,63 +592,42 @@ import { onMount } from 'svelte';
 				aria-describedby="drop-zone-help"
 				tabindex="0"
 			>
-			<div class="file-input-wrapper">
-				<SmartInput
-					bind:this={fileInput}
-					type="file"
-					accept=".mid,.midi"
-					id="midi-file"
-					label="MIDI File"
-					placeholder="Choose a MIDI file to upload"
-					validationOptions={fileValidationOptions}
-					errorPrevention={fileUploadPrevention}
-					disabled={uploadStatus === 'uploading'}
-					required
-					helpText="Supported formats: .mid, .midi (max 1MB)"
-					on:validation={handleSmartValidation}
-					on:change={handleSmartFileChange}
-					aria-label="Select MIDI file"
-					aria-describedby="file-input-help"
-					class="smart-file-input"
-				/>
-				
 				<!-- Hidden help text for screen readers -->
 				<div id="drop-zone-help" class="sr-only">
-					Select a MIDI file by clicking this area or dragging and dropping a file. Supported formats: .mid, .midi
+					Select a MIDI file by clicking this area or dragging and dropping a file. Supported formats: .mid, .midi (max 1MB)
 				</div>
-				<div id="file-input-help" class="sr-only">
-					Choose a MIDI file from your computer. Only .mid and .midi files are accepted.
-				</div>
-				<label for="midi-file" class="file-label" class:disabled={uploadStatus === 'uploading'}>
-					<svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+				
+				<div class="drop-zone-content">
+					<svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
 						<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
 						<polyline points="7,10 12,15 17,10" />
 						<line x1="12" y1="15" x2="12" y2="3" />
 					</svg>
-					<span class="upload-text">
+					<div class="upload-text">
 						{#if isDragOver}
-							Drop MIDI file here
+							<h3>Drop MIDI file here</h3>
 						{:else if selectedFile}
-							{selectedFile.name}
+							<h3>{selectedFile.name}</h3>
+							<p class="file-size">{formatFileSize(selectedFile.size)}</p>
 						{:else}
-							Drag & drop MIDI file or click to browse
+							<h3>Drag & drop MIDI file or click to browse</h3>
+							<p class="supported-formats">Supported formats: .mid, .midi (max 1MB)</p>
 						{/if}
-					</span>
-				</label>
-			</div>
-			
-			{#if isDragOver}
-				<div class="drag-overlay">
-					<div class="drag-indicator">
-						<svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-							<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-							<polyline points="7,10 12,15 17,10" />
-							<line x1="12" y1="15" x2="12" y2="3" />
-						</svg>
-						<p>Drop your MIDI file here</p>
 					</div>
 				</div>
-			{/if}
+				
+				{#if isDragOver}
+					<div class="drag-overlay">
+						<div class="drag-indicator">
+							<svg class="drop-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+								<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+								<polyline points="7,10 12,15 17,10" />
+								<line x1="12" y1="15" x2="12" y2="3" />
+							</svg>
+							<p>Drop your MIDI file here</p>
+						</div>
+					</div>
+				{/if}
 			</div>
 		{/if}
 
@@ -796,11 +765,7 @@ import { onMount } from 'svelte';
 			</div>
 		</div>
 
-		<ValidationMessage 
-			validation={validationResult} 
-			variant="card" 
-			showDetails={true}
-		/>
+
 		
 		{#if uploadMessage && uploadStatus !== 'error'}
 			<div class="upload-status" class:success={uploadStatus === 'success'}>
@@ -996,56 +961,57 @@ import { onMount } from 'svelte';
 		pointer-events: none;
 	}
 
-	.file-input-wrapper {
-		position: relative;
-		margin-bottom: 1rem;
-	}
-
-	.file-input {
-		position: absolute;
-		opacity: 0;
-		width: 100%;
-		height: 100%;
-		cursor: pointer;
-	}
-
-	.file-label {
+	.drop-zone-content {
 		display: flex;
+		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		gap: 0.75rem;
-		padding: 1.5rem 1rem;
-		border: none;
-		border-radius: 8px;
-		background: transparent;
-		color: #4a5568;
-		font-size: 1rem;
-		font-weight: 500;
-		cursor: pointer;
-		transition: all 0.2s ease;
+		gap: 1rem;
 		text-align: center;
-		width: 100%;
-		box-sizing: border-box;
-		max-width: 100%;
-	}
-
-	.file-label:hover {
-		color: #2b6cb0;
-	}
-
-	.file-label.disabled {
-		color: #a0aec0;
-		cursor: not-allowed;
+		pointer-events: none;
 	}
 
 	.upload-icon {
-		width: 2rem;
-		height: 2rem;
+		width: 3rem;
+		height: 3rem;
 		stroke-width: 2;
+		color: #4299e1;
+		transition: all 0.2s ease;
+	}
+
+	.drop-zone:hover .upload-icon {
+		color: #3182ce;
+		transform: scale(1.1);
 	}
 
 	.upload-text {
-		display: block;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.upload-text h3 {
+		margin: 0;
+		color: #2d3748;
+		font-size: 1.125rem;
+		font-weight: 600;
+		line-height: 1.4;
+	}
+
+	.upload-text p {
+		margin: 0;
+		color: #6b7280;
+		font-size: 0.875rem;
+		line-height: 1.4;
+	}
+
+	.file-size {
+		color: #4299e1 !important;
+		font-weight: 500;
+	}
+
+	.supported-formats {
+		color: #9ca3af !important;
 	}
 
 	.drag-overlay {
