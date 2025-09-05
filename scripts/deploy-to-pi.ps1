@@ -1,8 +1,10 @@
 # Piano LED Visualizer - Raspberry Pi Deployment Script (PowerShell)
-# Usage: .\deploy-to-pi.ps1 [pi-ip-address]
+# Usage: .\deploy-to-pi.ps1 [pi-ip-address] [backend-port]
+# Example: .\deploy-to-pi.ps1 192.168.1.225 5001
 
 param(
-    [string]$PiIP = "192.168.1.225"
+    [string]$PiIP = "192.168.1.225",
+    [string]$BackendPort = "5001"
 )
 
 $PI_USER = "pi"
@@ -51,7 +53,7 @@ try {
     $envConfig = @"
 FLASK_DEBUG=False
 FLASK_HOST=0.0.0.0
-FLASK_PORT=5000
+FLASK_PORT=$BackendPort
 "@
     Invoke-PiCommand "cat > $PROJECT_DIR/.env << 'EOF'`n$envConfig`nEOF"
 
@@ -91,19 +93,19 @@ server {
     }
     
     location /api/ {
-        proxy_pass http://localhost:5001;
+        proxy_pass http://localhost:$BackendPort;
         proxy_set_header Host `$host;
         proxy_set_header X-Real-IP `$remote_addr;
     }
     
     location /health {
-        proxy_pass http://localhost:5001/health;
+        proxy_pass http://localhost:$BackendPort/health;
         proxy_set_header Host `$host;
         proxy_set_header X-Real-IP `$remote_addr;
     }
     
     location /socket.io/ {
-        proxy_pass http://localhost:5001;
+        proxy_pass http://localhost:$BackendPort;
         proxy_http_version 1.1;
         proxy_set_header Upgrade `$http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -129,7 +131,7 @@ server {
 
     # Test the health endpoint
     try {
-        Invoke-PiCommand "curl -f http://localhost:5001/health > /dev/null 2>&1"
+        Invoke-PiCommand "curl -f http://$PiIP:$BackendPort/health > /dev/null 2>&1"
         Write-Host "✅ Backend health check: PASSED" -ForegroundColor Green
     }
     catch {
@@ -138,7 +140,7 @@ server {
     }
 
     try {
-        Invoke-PiCommand "curl -f http://localhost/health > /dev/null 2>&1"
+        Invoke-PiCommand "curl -f http://$PiIP/health > /dev/null 2>&1"
         Write-Host "✅ Nginx proxy health check: PASSED" -ForegroundColor Green
     }
     catch {
