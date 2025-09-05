@@ -2,6 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
+	import { browser } from '$app/environment';
 
 	// Playback state
 	let playbackState: 'idle' | 'playing' | 'paused' | 'stopped' = 'idle';
@@ -34,6 +35,8 @@
 	const maxReconnectAttempts = 5;
 
 	onMount(() => {
+		if (!browser) return;
+		
 		// Get song info from URL params or localStorage
 		const urlParams = new URLSearchParams(window.location.search);
 		const filename = urlParams.get('file') || localStorage.getItem('lastUploadedFile');
@@ -141,12 +144,14 @@
 			clearInterval(statusInterval);
 		}
 		// Clean up keyboard event listeners
-		if (window.keydownCleanup) {
+		if (browser && window.keydownCleanup) {
 			window.keydownCleanup();
 		}
 	});
 
 	function initWebSocket() {
+		if (!browser) return;
+		
 		try {
 			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 			const wsUrl = `${protocol}//${window.location.host}/socket.io/?EIO=4&transport=websocket`;
