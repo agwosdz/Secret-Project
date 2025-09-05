@@ -68,9 +68,6 @@ Type=simple
 User=root
 WorkingDirectory=$PROJECT_DIR/backend
 Environment=PATH=$PROJECT_DIR/backend/venv/bin
-Environment=BLINKA_USE_GPIOMEM=1
-Environment=BLINKA_FORCEBOARD=RASPBERRY_PI_ZERO_2_W
-Environment=BLINKA_FORCECHIP=BCM2XXX
 EnvironmentFile=$PROJECT_DIR/.env
 ExecStart=$PROJECT_DIR/backend/venv/bin/python start.py
 Restart=always
