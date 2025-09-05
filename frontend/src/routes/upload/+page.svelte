@@ -28,6 +28,7 @@ import { onMount } from 'svelte';
 	let showOnboardingTour = false;
 	let helpKeyboardCleanup = null;
 	let showPreferencesModal = false;
+	let validationResult: ValidationResult | null = null;
 	
 	
 
@@ -97,14 +98,7 @@ import { onMount } from 'svelte';
 		}
 	}
 
-	// Format file size for display
-	function formatFileSize(bytes: number): string {
-		if (bytes === 0) return '0 Bytes';
-		const k = 1024;
-		const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-		const i = Math.floor(Math.log(bytes) / Math.log(k));
-		return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-	}
+
 
 	// Process a selected file (common logic for click and drag-drop)
 	function processSelectedFile(file: File) {
