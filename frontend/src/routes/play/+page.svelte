@@ -96,34 +96,34 @@
 					event.preventDefault();
 					// Increase volume by 10%
 					volumeMultiplier = Math.min(1, volumeMultiplier + 0.1);
-					handleVolumeChange();
+					handleVolumeChange(volumeMultiplier);
 					break;
 				case 'ArrowDown':
 					event.preventDefault();
 					// Decrease volume by 10%
 					volumeMultiplier = Math.max(0, volumeMultiplier - 0.1);
-					handleVolumeChange();
+					handleVolumeChange(volumeMultiplier);
 					break;
 				case 'Minus':
 				case 'NumpadSubtract':
 					event.preventDefault();
 					// Decrease tempo by 5%
 					tempoMultiplier = Math.max(0.25, tempoMultiplier - 0.05);
-					handleTempoChange();
+					handleTempoChange(tempoMultiplier);
 					break;
 				case 'Equal':
 				case 'NumpadAdd':
 					event.preventDefault();
 					// Increase tempo by 5%
 					tempoMultiplier = Math.min(2.0, tempoMultiplier + 0.05);
-					handleTempoChange();
+					handleTempoChange(tempoMultiplier);
 					break;
 				case 'Digit0':
 				case 'Numpad0':
 					event.preventDefault();
 					// Reset tempo to 1x
 					tempoMultiplier = 1.0;
-					handleTempoChange();
+					handleTempoChange(tempoMultiplier);
 					break;
 			}
 		};
@@ -732,54 +732,54 @@
 						<label for="tempo-slider">Tempo: {Math.round(tempoMultiplier * 100)}%</label>
 						<div class="slider-buttons">
 							<button 
-								class="slider-btn" 
-								on:click={() => {
-									tempoMultiplier = Math.max(0.25, tempoMultiplier - 0.05);
-									handleTempoChange();
-								}}
-								aria-label="Decrease tempo"
-							>
-								<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-									<path d="M19 13H5v-2h14v2z"/>
-								</svg>
-							</button>
-							<button 
-								class="slider-btn" 
-								on:click={() => {
-									tempoMultiplier = 1;
-									handleTempoChange();
-								}}
-								aria-label="Reset tempo to 1x"
-							>
-								<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-									<path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
-								</svg>
-							</button>
-							<button 
-								class="slider-btn" 
-								on:click={() => {
-									tempoMultiplier = Math.min(2.0, tempoMultiplier + 0.05);
-									handleTempoChange();
-								}}
-								aria-label="Increase tempo"
-							>
-								<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-									<path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-								</svg>
-							</button>
+							class="slider-btn" 
+							on:click={() => {
+								tempoMultiplier = Math.max(0.25, tempoMultiplier - 0.05);
+								handleTempoChange(tempoMultiplier);
+							}}
+							aria-label="Decrease tempo"
+						>
+							<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+								<path d="M19 13H5v-2h14v2z"/>
+							</svg>
+						</button>
+						<button 
+							class="slider-btn" 
+							on:click={() => {
+								tempoMultiplier = 1;
+								handleTempoChange(tempoMultiplier);
+							}}
+							aria-label="Reset tempo to 1x"
+						>
+							<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+								<path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+							</svg>
+						</button>
+						<button 
+							class="slider-btn" 
+							on:click={() => {
+								tempoMultiplier = Math.min(2.0, tempoMultiplier + 0.05);
+								handleTempoChange(tempoMultiplier);
+							}}
+							aria-label="Increase tempo"
+						>
+							<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+								<path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+							</svg>
+						</button>
 						</div>
 					</div>
 					<input 
-						id="tempo-slider"
-						type="range" 
-						min="0.25" 
-						max="2.0" 
-						step="0.05" 
-						bind:value={tempoMultiplier}
-						on:input={handleTempoChange}
-						class="slider tempo-slider"
-						aria-label="Adjust tempo"
-					/>
+					id="tempo-slider"
+					type="range" 
+					min="0.25" 
+					max="2.0" 
+					step="0.05" 
+					bind:value={tempoMultiplier}
+					on:input={() => handleTempoChange(tempoMultiplier)}
+					class="slider tempo-slider"
+					aria-label="Adjust tempo"
+				/>
 					<div class="slider-labels">
 						<span>0.25x</span>
 						<span>1x</span>
@@ -793,54 +793,54 @@
 						<label for="volume-slider">Volume: {Math.round(volumeMultiplier * 100)}%</label>
 						<div class="slider-buttons">
 							<button 
-								class="slider-btn" 
-								on:click={() => {
-									volumeMultiplier = Math.max(0, volumeMultiplier - 0.1);
-									handleVolumeChange();
-								}}
-								aria-label="Decrease volume"
-							>
-								<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-									<path d="M19 13H5v-2h14v2z"/>
-								</svg>
-							</button>
-							<button 
-								class="slider-btn" 
-								on:click={() => {
-									volumeMultiplier = 0.5;
-									handleVolumeChange();
-								}}
-								aria-label="Set volume to 50%"
-							>
-								<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-									<path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
-								</svg>
-							</button>
-							<button 
-								class="slider-btn" 
-								on:click={() => {
-									volumeMultiplier = Math.min(1, volumeMultiplier + 0.1);
-									handleVolumeChange();
-								}}
-								aria-label="Increase volume"
-							>
-								<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-									<path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-								</svg>
-							</button>
+							class="slider-btn" 
+							on:click={() => {
+								volumeMultiplier = Math.max(0, volumeMultiplier - 0.1);
+								handleVolumeChange(volumeMultiplier);
+							}}
+							aria-label="Decrease volume"
+						>
+							<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+								<path d="M19 13H5v-2h14v2z"/>
+							</svg>
+						</button>
+						<button 
+							class="slider-btn" 
+							on:click={() => {
+								volumeMultiplier = 0.5;
+								handleVolumeChange(volumeMultiplier);
+							}}
+							aria-label="Set volume to 50%"
+						>
+							<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+								<path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+							</svg>
+						</button>
+						<button 
+							class="slider-btn" 
+							on:click={() => {
+								volumeMultiplier = Math.min(1, volumeMultiplier + 0.1);
+								handleVolumeChange(volumeMultiplier);
+							}}
+							aria-label="Increase volume"
+						>
+							<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+								<path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+							</svg>
+						</button>
 						</div>
 					</div>
 					<input 
-						id="volume-slider"
-						type="range" 
-						min="0" 
-						max="1" 
-						step="0.01" 
-						bind:value={volumeMultiplier}
-						on:input={handleVolumeChange}
-						class="slider volume-slider"
-						aria-label="Adjust volume"
-					/>
+					id="volume-slider"
+					type="range" 
+					min="0" 
+					max="1" 
+					step="0.01" 
+					bind:value={volumeMultiplier}
+					on:input={() => handleVolumeChange(volumeMultiplier)}
+					class="slider volume-slider"
+					aria-label="Adjust volume"
+				/>
 					<div class="slider-labels">
 						<span>0%</span>
 						<span>50%</span>
