@@ -142,8 +142,9 @@
 </script>
 
 <svelte:head>
-	<title>Upload MIDI File</title>
+	<title>Upload MIDI - Piano LED Visualizer</title>
 	<meta name="description" content="Upload MIDI files for LED visualization" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 </svelte:head>
 
 <div class="upload-container">
@@ -163,6 +164,9 @@
 				on:dragleave={handleDragLeave}
 				on:dragover={handleDragOver}
 				on:drop={handleDrop}
+				role="button"
+				aria-label="Drop zone for MIDI files. Click or drag files here."
+				tabindex="0"
 			>
 				<div class="file-input-wrapper">
 					<input
@@ -709,6 +713,7 @@
 		.upload-card {
 			padding: 1.25rem;
 			margin: 0.5rem;
+			border-radius: 12px;
 		}
 
 		.file-label {
@@ -736,6 +741,7 @@
 
 		.metadata-grid {
 			gap: 0.5rem;
+			grid-template-columns: 1fr;
 		}
 
 		.metadata-item {
@@ -755,10 +761,10 @@
 			gap: 0.75rem;
 		}
 
-		.upload-btn, .cancel-btn, .retry-button {
+		.upload-btn, .play-btn, .cancel-btn, .retry-button {
 			padding: 0.875rem 1.5rem;
 			font-size: 1rem;
-			min-height: 44px; /* iOS recommended touch target */
+			min-height: 48px; /* iOS recommended touch target */
 			width: 100%;
 			/* Enhanced touch feedback */
 			tap-highlight-color: transparent;
@@ -767,7 +773,7 @@
 			transition: transform 0.1s ease, background-color 0.2s ease;
 		}
 
-		.upload-btn:active, .cancel-btn:active, .retry-button:active {
+		.upload-btn:active, .cancel-btn:active, .retry-button:active, .play-btn:active {
 			transform: scale(0.98);
 		}
 

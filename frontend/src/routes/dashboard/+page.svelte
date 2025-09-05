@@ -850,6 +850,7 @@
 			flex-wrap: wrap;
 			padding: 0.75rem;
 			gap: 0.5rem;
+			min-height: 44px; /* Minimum touch target size */
 		}
 		
 		.connection-error {
@@ -862,12 +863,35 @@
 			width: 100%;
 			margin-top: 0.5rem;
 			padding: 0.75rem;
+			min-height: 44px; /* Minimum touch target size */
 		}
 		
 		.connection-time {
 			width: 100%;
 			margin-left: 0;
 			margin-top: 0.5rem;
+		}
+
+		.visualization-section,
+		.controls-section,
+		.performance-section,
+		.system-status-section {
+			padding: 1.25rem;
+			border-radius: 10px;
+		}
+
+		/* Improve touch targets for controls */
+		.visualization-toggle {
+			min-height: 44px;
+		}
+
+		.visualization-toggle label {
+			padding: 0.75rem;
+		}
+
+		.control-button {
+			min-height: 44px;
+			padding: 0.75rem 1rem;
 		}
 	}
 

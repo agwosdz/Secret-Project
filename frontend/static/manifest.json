@@ -1,0 +1,41 @@
+{
+  "name": "MIDI-to-LED System",
+  "short_name": "MIDI-LED",
+  "description": "Control LED lights with MIDI files",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "orientation": "any",
+  "categories": ["music", "entertainment"],
+  "shortcuts": [
+    {
+      "name": "Play MIDI",
+      "short_name": "Play",
+      "description": "Play your MIDI files",
+      "url": "/play",
+      "icons": [{ "src": "/icons/play-icon.svg", "sizes": "96x96", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Upload MIDI",
+      "short_name": "Upload",
+      "description": "Upload a new MIDI file",
+      "url": "/upload",
+      "icons": [{ "src": "/icons/upload-icon.svg", "sizes": "96x96", "type": "image/svg+xml" }]
+    }
+  ]
+}

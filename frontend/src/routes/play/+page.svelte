@@ -468,27 +468,47 @@
 	}
 
 	// Timeline interaction functions
-	function handleTimelineClick(event: MouseEvent) {
+	function handleTimelineClick(event: MouseEvent | TouchEvent) {
 		if (!timelineElement || totalDuration === 0) return;
 		
 		const rect = timelineElement.getBoundingClientRect();
-		const clickX = event.clientX - rect.left;
+		let clientX: number;
+		
+		if (event instanceof TouchEvent) {
+			if (event.touches.length === 0) return;
+			clientX = event.touches[0].clientX;
+		} else {
+			clientX = event.clientX;
+		}
+		
+		const clickX = clientX - rect.left;
 		const percentage = clickX / rect.width;
 		const newTime = percentage * totalDuration;
 		
 		handleSeek(Math.max(0, Math.min(newTime, totalDuration)));
 	}
 
-	function handleTimelineDragStart(event: MouseEvent) {
+	function handleTimelineDragStart(event: MouseEvent | TouchEvent) {
 		isDragging = true;
 		event.preventDefault();
 	}
 
-	function handleTimelineDrag(event: MouseEvent) {
+	function handleTimelineDrag(event: MouseEvent | TouchEvent) {
 		if (!isDragging || !timelineElement || totalDuration === 0) return;
 		
 		const rect = timelineElement.getBoundingClientRect();
-		const dragX = event.clientX - rect.left;
+		let clientX: number;
+		
+		if (event instanceof TouchEvent) {
+			if (event.touches.length === 0) return;
+			clientX = event.touches[0].clientX;
+			// Prevent page scrolling while dragging the timeline
+			event.preventDefault();
+		} else {
+			clientX = event.clientX;
+		}
+		
+		const dragX = clientX - rect.left;
 		const percentage = Math.max(0, Math.min(1, dragX / rect.width));
 		const newTime = percentage * totalDuration;
 		
@@ -497,7 +517,7 @@
 		progressPercentage = percentage * 100;
 	}
 
-	function handleTimelineDragEnd(event: MouseEvent) {
+	function handleTimelineDragEnd(event: MouseEvent | TouchEvent) {
 		if (!isDragging) return;
 		
 		isDragging = false;
@@ -594,7 +614,17 @@
 					on:mousemove={handleTimelineDrag}
 					on:mouseup={handleTimelineDragEnd}
 					on:mouseleave={handleTimelineDragEnd}
+					on:touchstart={handleTimelineDragStart}
+					on:touchmove={handleTimelineDrag}
+					on:touchend={handleTimelineDragEnd}
+					on:touchcancel={handleTimelineDragEnd}
 					class:dragging={isDragging}
+					aria-label="Playback timeline. Use slider to seek through the song."
+					role="slider"
+					aria-valuemin="0"
+					aria-valuemax="{totalDuration}"
+					aria-valuenow="{currentTime}"
+					aria-valuetext="{formatTime(currentTime)}"
 				>
 					<div class="timeline-track">
 						<div class="timeline-progress" style="width: {progressPercentage}%"></div>
@@ -620,11 +650,12 @@
 					disabled={playbackState === 'playing' || isLoading}
 					class="control-btn play-btn"
 					class:active={playbackState === 'playing'}
+					aria-label="Play"
 				>
-					<svg viewBox="0 0 24 24" fill="currentColor">
+					<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 						<path d="M8 5v14l11-7z"/>
 					</svg>
-					Play
+					<span class="btn-text">Play</span>
 				</button>
 
 				<button 
@@ -632,22 +663,24 @@
 					disabled={playbackState === 'idle' || playbackState === 'stopped'}
 					class="control-btn pause-btn"
 					class:active={playbackState === 'paused'}
+					aria-label="{playbackState === 'paused' ? 'Resume' : 'Pause'}"
 				>
-					<svg viewBox="0 0 24 24" fill="currentColor">
+					<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 						<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
 					</svg>
-					{playbackState === 'paused' ? 'Resume' : 'Pause'}
+					<span class="btn-text">{playbackState === 'paused' ? 'Resume' : 'Pause'}</span>
 				</button>
 
 				<button 
 					on:click={handleStop} 
 					disabled={playbackState === 'idle' || playbackState === 'stopped'}
 					class="control-btn stop-btn"
+					aria-label="Stop"
 				>
-					<svg viewBox="0 0 24 24" fill="currentColor">
+					<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 						<path d="M6 6h12v12H6z"/>
 					</svg>
-					Stop
+					<span class="btn-text">Stop</span>
 				</button>
 			</div>
 
@@ -655,7 +688,47 @@
 			<div class="enhanced-controls">
 				<!-- Tempo Control -->
 				<div class="control-group">
-					<label for="tempo-slider">Tempo: {Math.round(tempoMultiplier * 100)}%</label>
+					<div class="slider-header">
+						<label for="tempo-slider">Tempo: {Math.round(tempoMultiplier * 100)}%</label>
+						<div class="slider-buttons">
+							<button 
+								class="slider-btn" 
+								on:click={() => {
+									tempoMultiplier = Math.max(0.25, tempoMultiplier - 0.05);
+									handleTempoChange();
+								}}
+								aria-label="Decrease tempo"
+							>
+								<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+									<path d="M19 13H5v-2h14v2z"/>
+								</svg>
+							</button>
+							<button 
+								class="slider-btn" 
+								on:click={() => {
+									tempoMultiplier = 1;
+									handleTempoChange();
+								}}
+								aria-label="Reset tempo to 1x"
+							>
+								<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+									<path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+								</svg>
+							</button>
+							<button 
+								class="slider-btn" 
+								on:click={() => {
+									tempoMultiplier = Math.min(2.0, tempoMultiplier + 0.05);
+									handleTempoChange();
+								}}
+								aria-label="Increase tempo"
+							>
+								<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+									<path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+								</svg>
+							</button>
+						</div>
+					</div>
 					<input 
 						id="tempo-slider"
 						type="range" 
@@ -665,6 +738,7 @@
 						bind:value={tempoMultiplier}
 						on:input={handleTempoChange}
 						class="slider tempo-slider"
+						aria-label="Adjust tempo"
 					/>
 					<div class="slider-labels">
 						<span>0.25x</span>
@@ -675,7 +749,47 @@
 
 				<!-- Volume Control -->
 				<div class="control-group">
-					<label for="volume-slider">Volume: {Math.round(volumeMultiplier * 100)}%</label>
+					<div class="slider-header">
+						<label for="volume-slider">Volume: {Math.round(volumeMultiplier * 100)}%</label>
+						<div class="slider-buttons">
+							<button 
+								class="slider-btn" 
+								on:click={() => {
+									volumeMultiplier = Math.max(0, volumeMultiplier - 0.1);
+									handleVolumeChange();
+								}}
+								aria-label="Decrease volume"
+							>
+								<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+									<path d="M19 13H5v-2h14v2z"/>
+								</svg>
+							</button>
+							<button 
+								class="slider-btn" 
+								on:click={() => {
+									volumeMultiplier = 0.5;
+									handleVolumeChange();
+								}}
+								aria-label="Set volume to 50%"
+							>
+								<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+									<path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+								</svg>
+							</button>
+							<button 
+								class="slider-btn" 
+								on:click={() => {
+									volumeMultiplier = Math.min(1, volumeMultiplier + 0.1);
+									handleVolumeChange();
+								}}
+								aria-label="Increase volume"
+							>
+								<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+									<path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+								</svg>
+							</button>
+						</div>
+					</div>
 					<input 
 						id="volume-slider"
 						type="range" 
@@ -685,6 +799,7 @@
 						bind:value={volumeMultiplier}
 						on:input={handleVolumeChange}
 						class="slider volume-slider"
+						aria-label="Adjust volume"
 					/>
 					<div class="slider-labels">
 						<span>0%</span>
@@ -699,11 +814,12 @@
 						on:click={handleLoopToggle}
 						class="control-btn loop-btn"
 						class:active={loopEnabled}
+						aria-label="Toggle loop {loopEnabled ? 'off' : 'on'}"
 					>
-						<svg viewBox="0 0 24 24" fill="currentColor">
+						<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
 							<path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
 						</svg>
-						Loop {loopEnabled ? 'On' : 'Off'}
+						<span class="btn-text">Loop {loopEnabled ? 'On' : 'Off'}</span>
 					</button>
 					{#if loopEnabled}
 						<div class="loop-info">
@@ -914,10 +1030,11 @@
 
 	.timeline {
 		width: 100%;
-		height: 20px;
-		padding: 6px 0;
+		height: 44px; /* Increased height for better touch target */
+		padding: 15px 0; /* Increased padding for better touch target */
 		cursor: pointer;
 		user-select: none;
+		touch-action: none; /* Prevent browser handling of touch events */
 	}
 
 	.timeline.dragging {
@@ -927,9 +1044,9 @@
 	.timeline-track {
 		position: relative;
 		width: 100%;
-		height: 8px;
+		height: 12px; /* Increased height for better visibility */
 		background: #e5e7eb;
-		border-radius: 4px;
+		border-radius: 6px;
 		overflow: visible;
 	}
 
@@ -937,14 +1054,14 @@
 		height: 100%;
 		background: linear-gradient(90deg, #3b82f6, #1d4ed8);
 		transition: width 0.1s ease;
-		border-radius: 4px;
+		border-radius: 6px;
 	}
 
 	.timeline-handle {
 		position: absolute;
-		top: -4px;
-		width: 16px;
-		height: 16px;
+		top: -6px;
+		width: 24px; /* Increased size for touch */
+		height: 24px; /* Increased size for touch */
 		background: #1d4ed8;
 		border: 2px solid white;
 		border-radius: 50%;
@@ -954,7 +1071,8 @@
 		transition: all 0.1s ease;
 	}
 
-	.timeline-handle:hover {
+	.timeline-handle:hover,
+	.timeline-handle:active {
 		transform: translateX(-50%) scale(1.2);
 		box-shadow: 0 4px 8px rgba(0,0,0,0.3);
 	}
@@ -962,6 +1080,14 @@
 	.timeline.dragging .timeline-handle {
 		cursor: grabbing;
 		transform: translateX(-50%) scale(1.3);
+	}
+	
+	/* Add active state for touch devices */
+	@media (hover: none) {
+		.timeline:active .timeline-handle {
+			transform: translateX(-50%) scale(1.3);
+			box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+		}
 	}
 
 	.loop-region {
@@ -1315,32 +1441,112 @@
 		text-decoration: underline;
 	}
 
-	@media (max-width: 640px) {
+	/* Mobile and Touch Device Optimizations */
+	@media (max-width: 768px) {
 		.play-container {
 			padding: 1rem;
 		}
 
 		.play-card {
 			padding: 1.5rem;
+			border-radius: 12px;
+		}
+
+		.song-meta-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.enhanced-controls {
+			grid-template-columns: 1fr;
+			gap: 1.5rem;
+		}
+
+		.keyboard-shortcuts summary {
+			padding: 0.75rem 0;
+		}
+
+		.shortcuts-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.shortcut-item {
+			padding: 0.75rem;
+		}
+	}
+
+	@media (max-width: 640px) {
+		.play-container {
+			padding: 0.75rem;
+		}
+
+		.play-card {
+			padding: 1.25rem;
 		}
 
 		h1 {
 			font-size: 1.5rem;
+			margin-bottom: 1.25rem;
 		}
 
 		.controls {
 			flex-direction: column;
 			align-items: center;
+			gap: 1rem;
 		}
 
 		.control-btn {
 			width: 100%;
 			max-width: 200px;
+			height: 48px; /* Larger touch target */
+			font-size: 1rem;
+		}
+
+		.control-group {
+			width: 100%;
+		}
+
+		.slider {
+			height: 44px; /* Larger touch target */
+			padding: 15px 0;
+		}
+
+		.slider::-webkit-slider-thumb {
+			width: 24px;
+			height: 24px;
+		}
+
+		.slider::-moz-range-thumb {
+			width: 24px;
+			height: 24px;
 		}
 
 		.navigation {
 			flex-direction: column;
 			gap: 1rem;
+			padding-top: 1.25rem;
+		}
+
+		.nav-link {
+			padding: 0.75rem 0;
+			display: block;
+			width: 100%;
+			text-align: center;
+		}
+	}
+
+	/* Touch-specific enhancements */
+	@media (hover: none) {
+		.control-btn:active {
+			transform: translateY(2px);
+			box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+		}
+
+		.slider::-webkit-slider-thumb:active {
+			transform: scale(1.2);
+		}
+
+		.slider::-moz-range-thumb:active {
+			transform: scale(1.2);
 		}
 	}
 </style>
