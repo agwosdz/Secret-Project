@@ -197,6 +197,7 @@
 		height: 3px;
 		background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary) 100%);
 		animation: toast-progress linear;
+		animation-fill-mode: forwards;
 		transform-origin: left;
 	}
 
