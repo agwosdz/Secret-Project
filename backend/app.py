@@ -40,6 +40,12 @@ except ImportError as e:
     logger.warning(f"MIDI parser import failed: {e}")
     MIDIParser = None
 
+try:
+    from usb_midi_service import USBMIDIInputService
+except ImportError as e:
+    logger.warning(f"USB MIDI service import failed: {e}")
+    USBMIDIInputService = None
+
 # Configuration
 app.config['DEBUG'] = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
 app.config['HOST'] = os.environ.get('FLASK_HOST', '0.0.0.0')
@@ -119,6 +125,22 @@ if PlaybackService:
 else:
     logger.info("Playback service not available (import failed)")
     playback_service = None
+
+# Initialize USB MIDI input service
+if USBMIDIInputService:
+    try:
+        usb_midi_service = USBMIDIInputService(
+            led_controller=led_controller, 
+            websocket_callback=lambda event_type, data: socketio.emit(event_type, data),
+            num_leds=LED_COUNT
+        )
+        logger.info(f"USB MIDI input service initialized successfully with {LED_COUNT} LEDs")
+    except Exception as e:
+        logger.warning(f"USB MIDI input service initialization failed: {e}")
+        usb_midi_service = None
+else:
+    logger.info("USB MIDI input service not available (import failed)")
+    usb_midi_service = None
 
 @app.route('/')
 def hello_world():
@@ -1010,6 +1032,117 @@ def get_led_count():
             'message': 'An unexpected error occurred while getting LED count'
         }), 500
 
+# USB MIDI Input API Endpoints
+@app.route('/api/midi-input/devices', methods=['GET'])
+def get_midi_devices():
+    """Get available MIDI input devices"""
+    try:
+        if not usb_midi_service:
+            return jsonify({
+                'error': 'Service Unavailable',
+                'message': 'USB MIDI input service not available'
+            }), 503
+        
+        devices = usb_midi_service.get_available_devices()
+        return jsonify({
+            'status': 'success',
+            'devices': [device.__dict__ for device in devices]
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting MIDI devices: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred while getting MIDI devices'
+        }), 500
+
+@app.route('/api/midi-input/start', methods=['POST'])
+def start_midi_input():
+    """Start MIDI input listening"""
+    try:
+        if not usb_midi_service:
+            return jsonify({
+                'error': 'Service Unavailable',
+                'message': 'USB MIDI input service not available'
+            }), 503
+        
+        data = request.get_json() or {}
+        device_name = data.get('device_name')
+        
+        success = usb_midi_service.start_listening(device_name)
+        
+        if success:
+            return jsonify({
+                'status': 'success',
+                'message': 'MIDI input started successfully',
+                'device': usb_midi_service.current_device
+            }), 200
+        else:
+            return jsonify({
+                'error': 'Failed to Start',
+                'message': 'Could not start MIDI input listening'
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Error starting MIDI input: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred while starting MIDI input'
+        }), 500
+
+@app.route('/api/midi-input/stop', methods=['POST'])
+def stop_midi_input():
+    """Stop MIDI input listening"""
+    try:
+        if not usb_midi_service:
+            return jsonify({
+                'error': 'Service Unavailable',
+                'message': 'USB MIDI input service not available'
+            }), 503
+        
+        success = usb_midi_service.stop_listening()
+        
+        if success:
+            return jsonify({
+                'status': 'success',
+                'message': 'MIDI input stopped successfully'
+            }), 200
+        else:
+            return jsonify({
+                'error': 'Failed to Stop',
+                'message': 'Could not stop MIDI input listening'
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Error stopping MIDI input: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred while stopping MIDI input'
+        }), 500
+
+@app.route('/api/midi-input/status', methods=['GET'])
+def get_midi_input_status():
+    """Get MIDI input service status"""
+    try:
+        if not usb_midi_service:
+            return jsonify({
+                'error': 'Service Unavailable',
+                'message': 'USB MIDI input service not available'
+            }), 503
+        
+        status = usb_midi_service.get_status()
+        return jsonify({
+            'status': 'success',
+            'midi_input': status
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting MIDI input status: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred while getting MIDI input status'
+        }), 500
+
 @app.route('/api/dashboard', methods=['GET'])
 def api_dashboard():
     """API endpoint providing dashboard data for frontend"""
@@ -1019,7 +1152,8 @@ def api_dashboard():
             'backend_status': 'running',
             'led_controller_available': led_controller is not None,
             'midi_parser_available': midi_parser is not None,
-            'playback_service_available': playback_service is not None
+            'playback_service_available': playback_service is not None,
+            'usb_midi_service_available': usb_midi_service is not None
         }
         
         # Get playback status if available
@@ -1440,6 +1574,77 @@ def handle_get_status():
         })
     else:
         emit('error', {'message': 'Playback service not available'})
+    
+    # Also emit USB MIDI service status
+    if usb_midi_service:
+        midi_status = usb_midi_service.get_status()
+        emit('midi_input_status', {
+            'active': midi_status['active'],
+            'device_name': midi_status.get('device_name'),
+            'notes_received': midi_status.get('notes_received', 0),
+            'error_message': midi_status.get('error_message')
+        })
+
+@socketio.on('midi_input_start')
+def handle_midi_input_start(data):
+    """Handle WebSocket request to start MIDI input"""
+    try:
+        if not usb_midi_service:
+            emit('error', {'message': 'USB MIDI service not available'})
+            return
+            
+        device_name = data.get('device_name')
+        if not device_name:
+            emit('error', {'message': 'Device name is required'})
+            return
+            
+        success = usb_midi_service.start_input(device_name)
+        if success:
+            emit('midi_input_started', {
+                'device_name': device_name,
+                'message': f'MIDI input started on {device_name}'
+            })
+        else:
+            emit('error', {'message': f'Failed to start MIDI input on {device_name}'})
+            
+    except Exception as e:
+        logger.error(f"Error in WebSocket MIDI input start: {e}")
+        emit('error', {'message': f'MIDI input start failed: {str(e)}'})
+
+@socketio.on('midi_input_stop')
+def handle_midi_input_stop():
+    """Handle WebSocket request to stop MIDI input"""
+    try:
+        if not usb_midi_service:
+            emit('error', {'message': 'USB MIDI service not available'})
+            return
+            
+        usb_midi_service.stop_input()
+        emit('midi_input_stopped', {
+            'message': 'MIDI input stopped successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in WebSocket MIDI input stop: {e}")
+        emit('error', {'message': f'MIDI input stop failed: {str(e)}'})
+
+@socketio.on('get_midi_devices')
+def handle_get_midi_devices():
+    """Handle WebSocket request for available MIDI devices"""
+    try:
+        if not usb_midi_service:
+            emit('error', {'message': 'USB MIDI service not available'})
+            return
+            
+        devices = usb_midi_service.get_available_devices()
+        emit('midi_devices', {
+            'devices': devices,
+            'count': len(devices)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in WebSocket get MIDI devices: {e}")
+        emit('error', {'message': f'Failed to get MIDI devices: {str(e)}'})
 
 if __name__ == '__main__':
     print(f"Starting Piano LED Visualizer Backend...")

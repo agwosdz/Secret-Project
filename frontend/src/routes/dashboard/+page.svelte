@@ -104,6 +104,21 @@
 				}
 			});
 			
+			websocket.on('midi_input_status', (data) => {
+				console.log('MIDI input status:', data);
+				// Handle MIDI device status updates
+				if (systemStatus && systemStatus.system_status) {
+					systemStatus.system_status.midi_input_active = data.active;
+					systemStatus.system_status.midi_device_name = data.device_name;
+				}
+			});
+			
+			websocket.on('midi_input', (data) => {
+				console.log('MIDI input event:', data);
+				// Handle real-time MIDI input events
+				// The LED updates will come through the led_update event
+			});
+			
 			websocket.on('disconnect', (reason) => {
 					console.log('Dashboard WebSocket disconnected:', reason);
 					connectionStatus = 'disconnected';
@@ -450,11 +465,20 @@
 								</span>
 							</div>
 							<div class="status-item">
-								<span class="label">MIDI Parser:</span>
-								<span class="status {getStatusClass(systemStatus.system_status.midi_parser_available)}">
-									{systemStatus.system_status.midi_parser_available ? 'Available' : 'Unavailable'}
-								</span>
-							</div>
+							<span class="label">MIDI Parser:</span>
+							<span class="status {getStatusClass(systemStatus.system_status.midi_parser_available)}">
+								{systemStatus.system_status.midi_parser_available ? 'Available' : 'Unavailable'}
+							</span>
+						</div>
+						<div class="status-item">
+							<span class="label">USB MIDI Input:</span>
+							<span class="status {getStatusClass(systemStatus.system_status.midi_input_active)}">
+								{systemStatus.system_status.midi_input_active ? 'Active' : 'Inactive'}
+							</span>
+							{#if systemStatus.system_status.midi_device_name}
+								<div class="device-name">Device: {systemStatus.system_status.midi_device_name}</div>
+							{/if}
+						</div>
 							<div class="status-item">
 								<span class="label">Playback Service:</span>
 								<span class="status {getStatusClass(systemStatus.system_status.playback_service_available)}">
@@ -733,6 +757,13 @@
 	.status.error {
 		background-color: #ffeaea;
 		color: #d32f2f;
+	}
+
+	.device-name {
+		font-size: 0.75rem;
+		color: #666;
+		margin-top: 0.25rem;
+		font-style: italic;
 	}
 
 	.status.neutral {
