@@ -23,6 +23,15 @@ try:
 except ImportError:
     LEDController = None
 
+# Configuration imports with fallbacks
+try:
+    from config import get_config, get_piano_specs
+except ImportError:
+    def get_config(key, default=None):
+        return default
+    def get_piano_specs(piano_size):
+        return {'min_midi_note': 21, 'max_midi_note': 108, 'num_keys': 88}
+
 class MIDIInputState(Enum):
     """MIDI input service state enumeration"""
     IDLE = "idle"
@@ -50,19 +59,25 @@ class USBMIDIInputService:
     """Service for real-time USB MIDI input processing and LED visualization"""
     
     def __init__(self, led_controller: Optional[LEDController] = None, 
-                 websocket_callback: Optional[Callable] = None, num_leds: int = 88):
+                 websocket_callback: Optional[Callable] = None):
         """
         Initialize USB MIDI input service.
         
         Args:
             led_controller: LED controller instance for real-time visualization
             websocket_callback: Callback function for WebSocket event broadcasting
-            num_leds: Number of LEDs in the strip (default 88 for piano keys)
         """
         self.logger = logging.getLogger(__name__)
         self._led_controller = led_controller
         self._websocket_callback = websocket_callback
-        self.num_leds = num_leds
+        
+        # Load configuration
+        piano_size = get_config('piano_size', '88-key')
+        piano_specs = get_piano_specs(piano_size)
+        self.num_leds = piano_specs['num_keys']
+        self.min_midi_note = piano_specs['min_midi_note']
+        self.max_midi_note = piano_specs['max_midi_note']
+        self.led_orientation = get_config('led_orientation', 'normal')
         
         # Service state
         self._state = MIDIInputState.IDLE
@@ -80,10 +95,6 @@ class USBMIDIInputService:
         # Performance tracking
         self._event_count = 0
         self._last_event_time = 0.0
-        
-        # MIDI note to LED mapping (21-108 MIDI range to LED positions)
-        self.min_midi_note = 21  # A0
-        self.max_midi_note = 108  # C8
         
         # Check MIDI availability
         if not MIDO_AVAILABLE:
@@ -395,22 +406,29 @@ class USBMIDIInputService:
     
     def _map_note_to_led(self, midi_note: int) -> Optional[int]:
         """
-        Map MIDI note number to LED strip position.
+        Map MIDI note number to LED strip position with orientation support.
         
         Args:
             midi_note: MIDI note number (0-127)
             
         Returns:
-            LED index (0-based) or None if note is outside range
+            Physical LED index (0-based) or None if note is outside range
         """
         if midi_note < self.min_midi_note or midi_note > self.max_midi_note:
             return None
         
-        # Map MIDI range (21-108) to LED range (0 to num_leds-1)
+        # Calculate logical LED index (0 to num_leds-1)
         note_range = self.max_midi_note - self.min_midi_note
-        led_index = int((midi_note - self.min_midi_note) * (self.num_leds - 1) / note_range)
+        logical_index = int((midi_note - self.min_midi_note) * (self.num_leds - 1) / note_range)
+        logical_index = max(0, min(logical_index, self.num_leds - 1))
         
-        return max(0, min(led_index, self.num_leds - 1))
+        # Apply LED orientation mapping
+        if self.led_orientation == 'reversed':
+            physical_index = (self.num_leds - 1) - logical_index
+        else:
+            physical_index = logical_index
+            
+        return physical_index
     
     def _get_note_color(self, note: int) -> tuple:
         """

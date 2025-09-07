@@ -76,6 +76,16 @@
 					<span class="text">Dashboard</span>
 				</a>
 			</li>
+			<li>
+				<a 
+					href="/settings" 
+					class:active={currentPath === '/settings'}
+					on:click={closeMenu}
+				>
+					<span class="icon">⚙️</span>
+					<span class="text">Settings</span>
+				</a>
+			</li>
 		</ul>
 	</nav>
 

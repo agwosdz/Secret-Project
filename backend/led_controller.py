@@ -13,33 +13,42 @@ except ImportError as e:
     Color = None
     GPIO = None
 
+try:
+    from config import get_config
+except ImportError:
+    logging.warning("Config module not available, using defaults")
+    def get_config(key, default):
+        return default
+
 class LEDController:
     """Controller for WS2812B LED strip using rpi_ws281x library."""
     
-    def __init__(self, pin=19, num_pixels=30, brightness=0.3):
+    def __init__(self, pin=None, num_pixels=None, brightness=None):
         """
         Initialize LED controller.
         
         Args:
-            pin: GPIO pin for LED strip (default: 19)
-            num_pixels: Number of LEDs in strip (default: 30)
-            brightness: LED brightness 0.0-1.0 (default: 0.3)
+            pin: GPIO pin for LED strip (uses config if None)
+            num_pixels: Number of LEDs in strip (uses config if None)
+            brightness: LED brightness 0.0-1.0 (uses config if None)
         """
         self.logger = logging.getLogger(__name__)
         
+        # Load configuration values if not provided
+        self.pin = pin if pin is not None else get_config('gpio_pin', 19)
+        self.num_pixels = num_pixels if num_pixels is not None else get_config('led_count', 30)
+        self.brightness = brightness if brightness is not None else get_config('brightness', 0.3)
+        
+        # Get LED orientation setting
+        self.led_orientation = get_config('led_orientation', 'normal')
+        
         if not HARDWARE_AVAILABLE:
             self.logger.warning("Hardware not available - running in simulation mode")
-            self.pin = pin
-            self.num_pixels = num_pixels
-            self.brightness = brightness
             self.pixels = None
-            self._led_state = [(0, 0, 0)] * num_pixels  # Track LED state for simulation
+            self._led_state = [(0, 0, 0)] * self.num_pixels  # Track LED state for simulation
             return
             
-        self.pin = pin
-        self.num_pixels = num_pixels
-        self.brightness = brightness
-        self._led_state = [(0, 0, 0)] * num_pixels  # Track current LED state
+        self._led_state = [(0, 0, 0)] * self.num_pixels  # Track current LED state
         
         try:
             # rpi_ws281x configuration
@@ -67,12 +76,26 @@ class LEDController:
             self.logger.error(f"Failed to initialize LED controller: {e}")
             raise
     
+    def _map_led_index(self, index: int) -> int:
+        """
+        Map logical LED index to physical LED index based on orientation.
+        
+        Args:
+            index: Logical LED index (0-based)
+            
+        Returns:
+            int: Physical LED index
+        """
+        if self.led_orientation == 'reversed':
+            return self.num_pixels - 1 - index
+        return index
+    
     def turn_on_led(self, index: int, color: tuple = (255, 255, 255), auto_show: bool = True) -> bool:
         """
         Turn on a specific LED.
         
         Args:
-            index: LED index (0-based)
+            index: Logical LED index (0-based)
             color: RGB color tuple (default: white)
             auto_show: Whether to immediately update the LED strip (default: True)
             
@@ -83,6 +106,9 @@ class LEDController:
             if not 0 <= index < self.num_pixels:
                 raise ValueError(f"LED index {index} out of range (0-{self.num_pixels-1})")
             
+            # Map logical index to physical index based on orientation
+            physical_index = self._map_led_index(index)
+            
             # Check if color actually changed to avoid unnecessary updates
             if self._led_state[index] == color:
                 return True
@@ -90,7 +116,7 @@ class LEDController:
             self._led_state[index] = color
             
             if not HARDWARE_AVAILABLE:
-                self.logger.debug(f"[SIMULATION] LED {index} set to color {color}")
+                self.logger.debug(f"[SIMULATION] LED {index} (physical: {physical_index}) set to color {color}")
                 return True
                 
             if not self.pixels:
@@ -99,7 +125,7 @@ class LEDController:
             # Set the pixel color using rpi_ws281x Color function
             # Convert RGB tuple to rpi_ws281x Color format
             r, g, b = color
-            self.pixels.setPixelColor(index, Color(r, g, b))
+            self.pixels.setPixelColor(physical_index, Color(r, g, b))
             
             if auto_show:
                 self.show()

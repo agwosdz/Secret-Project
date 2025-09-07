@@ -28,6 +28,15 @@ try:
 except ImportError:
     PerformanceMonitor = None
 
+try:
+    from config import get_config, get_piano_specs
+except ImportError:
+    logging.warning("Config module not available, using defaults")
+    def get_config(key, default):
+        return default
+    def get_piano_specs(piano_size):
+        return {'led_count': 88, 'min_midi_note': 21, 'max_midi_note': 108}
+
 class PlaybackState(Enum):
     """Playback state enumeration"""
     IDLE = "idle"
@@ -58,18 +67,27 @@ class PlaybackStatus:
 class PlaybackService:
     """Service for coordinating MIDI playback with LED visualization"""
     
-    def __init__(self, led_controller: Optional[LEDController] = None, num_leds: int = 30, midi_parser: Optional[MIDIParser] = None):
+    def __init__(self, led_controller: Optional[LEDController] = None, num_leds: int = None, midi_parser: Optional[MIDIParser] = None):
         """
-        Initialize playback service.
+        Initialize playback service with configurable piano specifications.
         
         Args:
             led_controller: LED controller instance
-            num_leds: Number of LEDs in the strip
+            num_leds: Number of LEDs in the strip (optional, loaded from config if not provided)
             midi_parser: MIDI parser instance for file parsing
         """
         self.logger = logging.getLogger(__name__)
         self._led_controller = led_controller
-        self.num_leds = num_leds
+        
+        # Load configuration
+        piano_size = get_config('piano_size', '88-key')
+        piano_specs = get_piano_specs(piano_size)
+        
+        self.num_leds = num_leds or piano_specs['num_keys']
+        self.min_midi_note = piano_specs['min_midi_note']
+        self.max_midi_note = piano_specs['max_midi_note']
+        self.led_orientation = get_config('led_orientation', 'normal')
+        
         self._midi_parser = midi_parser or (MIDIParser() if MIDIParser else None)
         
         # Playback state
@@ -641,7 +659,7 @@ class PlaybackService:
     
     def _map_note_to_led(self, note: int) -> int:
         """
-        Map MIDI note to LED index.
+        Map MIDI note to LED index with configuration and orientation support.
         
         Args:
             note: MIDI note number (0-127)
@@ -649,21 +667,21 @@ class PlaybackService:
         Returns:
             int: LED index
         """
-        # Simple linear mapping from piano range to LED strip
-        # Piano range: A0 (21) to C8 (108) = 88 keys
-        piano_start = 21
-        piano_end = 108
+        # Use configured piano range
+        if note < self.min_midi_note:
+            note = self.min_midi_note
+        elif note > self.max_midi_note:
+            note = self.max_midi_note
         
-        if note < piano_start:
-            note = piano_start
-        elif note > piano_end:
-            note = piano_end
+        # Map to logical LED range
+        piano_range = self.max_midi_note - self.min_midi_note
+        logical_index = int((note - self.min_midi_note) * (self.num_leds - 1) / piano_range)
         
-        # Map to LED range
-        piano_range = piano_end - piano_start
-        led_index = int((note - piano_start) * (self.num_leds - 1) / piano_range)
-        
-        return led_index
+        # Apply orientation mapping
+        if self.led_orientation == 'reversed':
+            return self.num_leds - 1 - logical_index
+        else:
+            return logical_index
     
     def _get_note_color(self, note: int) -> tuple:
         """

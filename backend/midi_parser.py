@@ -3,22 +3,38 @@ import os
 from typing import List, Dict, Any, Optional
 import logging
 
+try:
+    from config import get_config, get_piano_specs
+except ImportError:
+    logging.warning("Config module not available, using defaults")
+    def get_config(key, default):
+        return default
+    def get_piano_specs(piano_size):
+        return {'led_count': 88, 'min_midi_note': 21, 'max_midi_note': 108}
+
 logger = logging.getLogger(__name__)
 
 class MIDIParser:
     """Service for parsing MIDI files into timed note sequences for LED visualization."""
     
-    def __init__(self, led_count: int = 88):
+    def __init__(self, led_count: int = None):
         """
-        Initialize MIDI parser.
+        Initialize MIDI parser with configurable piano specifications.
         
         Args:
-            led_count: Number of LEDs in the strip (default 88 for piano keys)
+            led_count: Number of LEDs (optional, loaded from config if not provided)
         """
-        self.led_count = led_count
-        # Map MIDI note range (21-108, A0-C8) to LED positions
-        self.min_midi_note = 21  # A0
-        self.max_midi_note = 108  # C8
+        # Load configuration values
+        piano_size = get_config('piano_size', '88-key')
+        piano_specs = get_piano_specs(piano_size)
+        
+        self.led_count = led_count if led_count is not None else piano_specs['num_keys']
+        self.min_midi_note = piano_specs['min_midi_note']
+        self.max_midi_note = piano_specs['max_midi_note']
+        self.piano_size = piano_size
+        self.led_orientation = get_config('led_orientation', 'normal')
+        
+        logger.info(f"MIDI parser initialized for {piano_size} piano with {self.led_count} LEDs, MIDI range {self.min_midi_note}-{self.max_midi_note}, orientation: {self.led_orientation}")
         
     def parse_file(self, file_path: str) -> Dict[str, Any]:
         """
@@ -166,7 +182,7 @@ class MIDIParser:
     
     def _map_note_to_led(self, midi_note: int) -> Optional[int]:
         """
-        Map MIDI note number to LED strip position.
+        Map MIDI note number to LED strip position with orientation support.
         
         Args:
             midi_note: MIDI note number (0-127)
@@ -178,14 +194,18 @@ class MIDIParser:
         if midi_note < self.min_midi_note or midi_note > self.max_midi_note:
             return None
             
-        # Map to LED position (0-based)
-        led_index = midi_note - self.min_midi_note
+        # Map to logical LED position (0-based)
+        logical_index = midi_note - self.min_midi_note
         
         # Ensure within LED strip bounds
-        if led_index >= self.led_count:
+        if logical_index >= self.led_count:
             return None
-            
-        return led_index
+        
+        # Apply orientation mapping
+        if self.led_orientation == 'reversed':
+            return self.led_count - 1 - logical_index
+        else:
+            return logical_index
     
     def _extract_metadata(self, midi_file: mido.MidiFile) -> Dict[str, Any]:
         """

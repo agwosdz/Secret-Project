@@ -55,7 +55,7 @@ app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__fil
 
 # Import configuration module
 try:
-    from config import load_config, update_config, get_config
+    from config import load_config, update_config, get_config, validate_config, get_piano_specs
     # Load LED count from configuration
     LED_COUNT = get_config('led_count', int(os.environ.get('LED_COUNT', 246)))
     logger.info(f"Loaded LED count from configuration: {LED_COUNT}")
@@ -70,8 +70,8 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 # Initialize LED controller (with error handling for development without hardware)
 if LEDController:
     try:
-        led_controller = LEDController(num_pixels=LED_COUNT)
-        logger.info(f"LED controller initialized successfully with {LED_COUNT} LEDs")
+        led_controller = LEDController()  # Uses configuration values
+        logger.info(f"LED controller initialized successfully with configuration")
     except Exception as e:
         logger.warning(f"LED controller initialization failed (development mode?): {e}")
         led_controller = None
@@ -82,8 +82,8 @@ else:
 # Initialize MIDI parser
 if MIDIParser:
     try:
-        midi_parser = MIDIParser()
-        logger.info("MIDI parser initialized successfully")
+        midi_parser = MIDIParser()  # Uses configuration values
+        logger.info("MIDI parser initialized successfully with configuration")
     except Exception as e:
         logger.warning(f"MIDI parser initialization failed: {e}")
         midi_parser = None
@@ -115,10 +115,10 @@ def websocket_status_callback(status):
 # Initialize playback service
 if PlaybackService:
     try:
-        playback_service = PlaybackService(led_controller=led_controller, num_leds=LED_COUNT, midi_parser=midi_parser)
+        playback_service = PlaybackService(led_controller=led_controller, midi_parser=midi_parser)  # Uses configuration values
         # Register WebSocket callback for real-time updates
         playback_service.add_status_callback(websocket_status_callback)
-        logger.info(f"Playback service initialized successfully with {LED_COUNT} LEDs")
+        logger.info(f"Playback service initialized successfully with configuration")
     except Exception as e:
         logger.warning(f"Playback service initialization failed: {e}")
         playback_service = None
@@ -131,10 +131,9 @@ if USBMIDIInputService:
     try:
         usb_midi_service = USBMIDIInputService(
             led_controller=led_controller, 
-            websocket_callback=lambda event_type, data: socketio.emit(event_type, data),
-            num_leds=LED_COUNT
-        )
-        logger.info(f"USB MIDI input service initialized successfully with {LED_COUNT} LEDs")
+            websocket_callback=lambda event_type, data: socketio.emit(event_type, data)
+        )  # Uses configuration values
+        logger.info(f"USB MIDI input service initialized successfully with configuration")
     except Exception as e:
         logger.warning(f"USB MIDI input service initialization failed: {e}")
         usb_midi_service = None
@@ -1030,6 +1029,104 @@ def get_led_count():
         return jsonify({
             'error': 'Internal Server Error',
             'message': 'An unexpected error occurred while getting LED count'
+        }), 500
+
+@app.route('/api/settings', methods=['GET'])
+def get_settings():
+    """Get all current settings"""
+    try:
+        config = load_config()
+        return jsonify({
+            'status': 'success',
+            'settings': {
+                'piano_size': config.get('piano_size', '88-key'),
+                'gpio_pin': config.get('gpio_pin', 19),
+                'led_orientation': config.get('led_orientation', 'normal'),
+                'led_count': config.get('led_count', 246),
+                'brightness': config.get('brightness', 0.5)
+            }
+        }), 200
+    except Exception as e:
+        logger.error(f"Error getting settings: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred while getting settings'
+        }), 500
+
+@app.route('/api/settings', methods=['POST'])
+def update_settings():
+    """Update settings with validation"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'error': 'Bad Request',
+                'message': 'No JSON data provided'
+            }), 400
+        
+        # Load current config
+        current_config = load_config()
+        
+        # Update only provided fields
+        updated_config = current_config.copy()
+        
+        # Handle piano size changes
+        if 'piano_size' in data:
+            piano_size = data['piano_size']
+            updated_config['piano_size'] = piano_size
+            
+            # Auto-update LED count based on piano size
+            specs = get_piano_specs(piano_size)
+            updated_config['led_count'] = specs['num_keys']
+        
+        # Update other fields
+        for field in ['gpio_pin', 'led_orientation', 'brightness']:
+            if field in data:
+                updated_config[field] = data[field]
+        
+        # Handle custom LED count
+        if 'led_count' in data and updated_config.get('piano_size') == 'custom':
+            updated_config['led_count'] = data['led_count']
+        
+        # Validate configuration
+        validation_errors = validate_config(updated_config)
+        if validation_errors:
+            return jsonify({
+                'error': 'Validation Error',
+                'message': 'Invalid configuration values',
+                'details': validation_errors
+            }), 400
+        
+        # Save configuration
+        from config import save_config
+        if not save_config(updated_config):
+            return jsonify({
+                'error': 'Internal Server Error',
+                'message': 'Failed to save configuration'
+            }), 500
+        
+        # Update global LED_COUNT if changed
+        global LED_COUNT
+        if 'led_count' in updated_config:
+            LED_COUNT = updated_config['led_count']
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Settings updated successfully',
+            'settings': {
+                'piano_size': updated_config.get('piano_size'),
+                'gpio_pin': updated_config.get('gpio_pin'),
+                'led_orientation': updated_config.get('led_orientation'),
+                'led_count': updated_config.get('led_count'),
+                'brightness': updated_config.get('brightness')
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error updating settings: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred while updating settings'
         }), 500
 
 # USB MIDI Input API Endpoints
