@@ -49,7 +49,15 @@ try {
     Write-Host "⚛️ Step 5: Building frontend..." -ForegroundColor Yellow
     Invoke-PiCommand "cd $PROJECT_DIR/frontend && npm install && npm run build"
 
-    Write-Host "⚙️ Step 6: Creating environment configuration..." -ForegroundColor Yellow
+    Write-Host "🔐 Step 6: Fixing file permissions for nginx..." -ForegroundColor Yellow
+    # Fix home directory permissions to allow nginx to traverse
+    Invoke-PiCommand "chmod 755 /home/pi"
+    # Set proper ownership for frontend build files
+    Invoke-PiCommand "sudo chown -R www-data:www-data $PROJECT_DIR/frontend/build"
+    # Ensure parent directories have proper permissions
+    Invoke-PiCommand "chmod 755 $PROJECT_DIR $PROJECT_DIR/frontend"
+
+    Write-Host "⚙️ Step 7: Creating environment configuration..." -ForegroundColor Yellow
     $envConfig = @"
 FLASK_DEBUG=False
 FLASK_HOST=0.0.0.0
@@ -57,7 +65,7 @@ FLASK_PORT=$BackendPort
 "@
     Invoke-PiCommand "cat > $PROJECT_DIR/.env << 'EOF'`n$envConfig`nEOF"
 
-    Write-Host "🔧 Step 7: Setting up systemd service..." -ForegroundColor Yellow
+    Write-Host "🔧 Step 8: Setting up systemd service..." -ForegroundColor Yellow
     $serviceConfig = @"
 [Unit]
 Description=Piano LED Visualizer Backend
@@ -78,7 +86,7 @@ WantedBy=multi-user.target
 "@
     Invoke-PiCommand "sudo tee /etc/systemd/system/piano-led-visualizer.service > /dev/null << 'EOF'`n$serviceConfig`nEOF"
 
-    Write-Host "🌐 Step 8: Configuring nginx..." -ForegoundColor Yellow
+    Write-Host "🌐 Step 9: Configuring nginx..." -ForegroundColor Yellow
     $nginxConfig = @"
 server {
     listen 80;
@@ -117,18 +125,18 @@ server {
     Invoke-PiCommand "sudo ln -sf /etc/nginx/sites-available/piano-led-visualizer /etc/nginx/sites-enabled/"
     Invoke-PiCommand "sudo rm -f /etc/nginx/sites-enabled/default"
 
-    Write-Host "🚀 Step 9: Starting services..." -ForegroundColor Yellow
+    Write-Host "🚀 Step 10: Starting services..." -ForegroundColor Yellow
     Invoke-PiCommand "sudo systemctl daemon-reload"
     Invoke-PiCommand "sudo systemctl enable piano-led-visualizer.service"
     Invoke-PiCommand "sudo systemctl start piano-led-visualizer.service"
     Invoke-PiCommand "sudo systemctl restart nginx"
 
-    Write-Host "✅ Step 10: Verifying deployment..." -ForegroundColor Yellow
+    Write-Host "✅ Step 11: Verifying deployment..." -ForegroundColor Yellow
     Start-Sleep -Seconds 5
 
     # Test the health endpoint
     try {
-        Invoke-PiCommand "curl -f http://$PiIP:$BackendPort/health > /dev/null 2>&1"
+        Invoke-PiCommand "curl -f http://${PiIP}:$BackendPort/health > /dev/null 2>&1"
         Write-Host "✅ Backend health check: PASSED" -ForegroundColor Green
     }
     catch {
