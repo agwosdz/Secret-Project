@@ -152,7 +152,7 @@ def check_hardware_connections():
     logger.info("  LED Strip    ->  Raspberry Pi")
     logger.info("  VCC/5V       ->  5V (Pin 2 or 4)")
     logger.info("  GND          ->  GND (Pin 6, 9, 14, 20, 25, 30, 34, or 39)")
-    logger.info("  DIN/Data     ->  GPIO18 (Pin 12) - Default")
+    logger.info("  DIN/Data     ->  GPIO19 (Pin 35) - Default")
     logger.info("")
     logger.info("Alternative GPIO pins for data:")
     logger.info("  GPIO12 (Pin 32), GPIO13 (Pin 33), GPIO19 (Pin 35)")
@@ -175,8 +175,8 @@ def test_gpio_basic():
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
         
-        # Test GPIO18 (commonly used for LED strips)
-        test_pin = 18
+        # Test GPIO19 (commonly used for LED strips)
+test_pin = 19
         GPIO.setup(test_pin, GPIO.OUT)
         logger.info(f"✓ GPIO{test_pin} setup successful")
         
@@ -213,12 +213,12 @@ def test_led_basic():
         
         # LED strip configuration
         LED_COUNT = 1         # Number of LED pixels
-        LED_PIN = 18          # GPIO pin connected to the pixels (18 uses PWM!)
+        LED_PIN = 19          # GPIO pin connected to the pixels (19 uses PWM!)
         LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
         LED_DMA = 10          # DMA channel to use for generating signal (try 10)
         LED_BRIGHTNESS = 25   # Set to 0 for darkest and 255 for brightest (10% = 25)
         LED_INVERT = False    # True to invert the signal (when using NPN transistor level shift)
-        LED_CHANNEL = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
+        LED_CHANNEL = 1       # set to '1' for GPIOs 13, 19, 41, 45 or 53
         
         pixels = PixelStrip(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
         pixels.begin()

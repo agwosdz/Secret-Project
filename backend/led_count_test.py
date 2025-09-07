@@ -14,12 +14,12 @@ logger = logging.getLogger(__name__)
 
 # LED strip configuration
 LED_COUNT = 30  # Start with a small count to test
-LED_PIN = 18
+LED_PIN = 19
 LED_FREQ_HZ = 800000
 LED_DMA = 10
 LED_BRIGHTNESS = 76  # 30% brightness
 LED_INVERT = False
-LED_CHANNEL = 0
+LED_CHANNEL = 1
 
 def test_individual_leds(strip, count=30):
     """Test individual LEDs one by one"""

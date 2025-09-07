@@ -92,7 +92,7 @@ sudo python3 test_led_controller.py --device
 |---------------|------------------|-------------|
 | VCC/5V        | Pin 2 or 4 (5V)  | Power supply |
 | GND           | Pin 6 (GND)      | Ground |
-| DIN/Data      | Pin 12 (GPIO18)  | Data signal |
+| DIN/Data      | Pin 35 (GPIO19)  | Data signal |
 
 ### Power Considerations
 
@@ -104,7 +104,7 @@ sudo python3 test_led_controller.py --device
 
 ### Alternative GPIO Pins
 
-If GPIO18 doesn't work, try these alternatives:
+If GPIO19 doesn't work, try these alternatives:
 - GPIO12 (Pin 32)
 - GPIO13 (Pin 33) 
 - GPIO19 (Pin 35)
@@ -262,7 +262,7 @@ BLINKA_USE_GPIOMEM=1 python3 test_led_device.py --quick
 2024-01-XX XX:XX:XX - INFO - Testing hardware library availability...
 2024-01-XX XX:XX:XX - INFO - ✓ board module imported successfully
 2024-01-XX XX:XX:XX - INFO - ✓ neopixel module imported successfully
-2024-01-XX XX:XX:XX - INFO - ✓ GPIO pin D18 available
+2024-01-XX XX:XX:XX - INFO - ✓ GPIO pin D19 available
 
 2024-01-XX XX:XX:XX - INFO - Testing LED controller initialization...
 2024-01-XX XX:XX:XX - INFO - ✓ LED controller initialized with 30 pixels
@@ -325,7 +325,7 @@ If you're still having issues after following this guide:
 
 1. **Check hardware connections** against the wiring diagram
 2. **Verify power supply** can handle your LED count
-3. **Try different GPIO pins** if GPIO18 doesn't work
+3. **Try different GPIO pins** if GPIO19 doesn't work
 4. **Test with minimal setup** (1-3 LEDs only)
 5. **Check LED strip compatibility** (must be WS2812B/NeoPixel compatible)
 

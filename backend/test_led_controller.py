@@ -60,7 +60,7 @@ class TestLEDController(unittest.TestCase):
         self.assertTrue(self.mock_pixelstrip_class.called)
         call_args = self.mock_pixelstrip_class.call_args
         self.assertEqual(call_args[0][0], 30)  # num_pixels
-        self.assertEqual(call_args[0][1], 18)  # pin
+        self.assertEqual(call_args[0][1], 19)  # pin
         self.assertEqual(call_args[0][5], int(0.3 * 255))  # brightness converted to 0-255
         
         # Verify begin() was called

@@ -87,12 +87,12 @@ import RPi.GPIO as GPIO
 
 # LED strip configuration
 LED_COUNT = 144
-LED_PIN = 18          # GPIO pin (18 uses PWM!)
+LED_PIN = 19          # GPIO pin (19 uses PWM!)
 LED_FREQ_HZ = 800000  # LED signal frequency
 LED_DMA = 10          # DMA channel
 LED_BRIGHTNESS = 255  # Brightness (0-255)
 LED_INVERT = False    # Signal inversion
-LED_CHANNEL = 0       # PWM channel
+LED_CHANNEL = 1       # PWM channel
 
 # Initialize the LED strip
 pixels = PixelStrip(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)

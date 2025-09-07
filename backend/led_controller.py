@@ -16,12 +16,12 @@ except ImportError as e:
 class LEDController:
     """Controller for WS2812B LED strip using rpi_ws281x library."""
     
-    def __init__(self, pin=18, num_pixels=30, brightness=0.3):
+    def __init__(self, pin=19, num_pixels=30, brightness=0.3):
         """
         Initialize LED controller.
         
         Args:
-            pin: GPIO pin for LED strip (default: 18)
+            pin: GPIO pin for LED strip (default: 19)
             num_pixels: Number of LEDs in strip (default: 30)
             brightness: LED brightness 0.0-1.0 (default: 0.3)
         """
@@ -46,7 +46,7 @@ class LEDController:
             LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
             LED_DMA = 10          # DMA channel to use for generating signal (try 10)
             LED_INVERT = False    # True to invert the signal (when using NPN transistor level shift)
-            LED_CHANNEL = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
+            LED_CHANNEL = 1       # set to '1' for GPIOs 13, 19, 41, 45 or 53
             
             # Initialize rpi_ws281x strip
             self.pixels = PixelStrip(

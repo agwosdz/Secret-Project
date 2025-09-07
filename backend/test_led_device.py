@@ -52,7 +52,7 @@ def test_hardware_availability():
         logger.error(f"✗ Failed to import RPi.GPIO: {e}")
         assert False, f"RPi.GPIO import failed: {e}"
     
-    logger.info("✓ GPIO pin 18 will be used for LED strip")
+    logger.info("✓ GPIO pin 19 will be used for LED strip")
     assert True, "Hardware availability test passed"
     
     logger.info("✓ All hardware libraries available")
