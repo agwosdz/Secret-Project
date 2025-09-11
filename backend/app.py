@@ -1098,11 +1098,22 @@ def update_settings():
             }), 400
         
         # Save configuration
-        from config import save_config
-        if not save_config(updated_config):
+        logger.info(f"Attempting to save config: {updated_config}")
+        try:
+            from config import save_config
+            save_result = save_config(updated_config)
+            logger.info(f"Save config result: {save_result}")
+            if not save_result:
+                logger.error("save_config returned False")
+                return jsonify({
+                    'error': 'Internal Server Error',
+                    'message': 'Failed to save configuration'
+                }), 500
+        except Exception as save_error:
+            logger.error(f"Exception during save_config: {save_error}")
             return jsonify({
                 'error': 'Internal Server Error',
-                'message': 'Failed to save configuration'
+                'message': f'Failed to save configuration: {str(save_error)}'
             }), 500
         
         # Update global LED_COUNT if changed
