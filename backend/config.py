@@ -90,7 +90,7 @@ def validate_config(config):
     
     # Validate piano size
     if "piano_size" in config:
-        valid_sizes = ["25-key", "37-key", "49-key", "61-key", "76-key", "88-key"]
+        valid_sizes = ["25-key", "37-key", "49-key", "61-key", "76-key", "88-key", "custom"]
         if config["piano_size"] not in valid_sizes:
             errors.append(f"piano_size must be one of: {', '.join(valid_sizes)}")
     
