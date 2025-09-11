@@ -59,19 +59,19 @@ class LEDController:
             
             # Initialize rpi_ws281x strip
             self.pixels = PixelStrip(
-                num_pixels,
-                pin,
+                self.num_pixels,
+                self.pin,
                 LED_FREQ_HZ,
                 LED_DMA,
                 LED_INVERT,
-                int(brightness * 255),  # Convert brightness to 0-255 range
+                int(self.brightness * 255),  # Convert brightness to 0-255 range
                 LED_CHANNEL
             )
             
             # Initialize the library (must be called once before other functions)
             self.pixels.begin()
             
-            self.logger.info(f"LED controller initialized with {num_pixels} pixels on pin {pin} using rpi_ws281x")
+            self.logger.info(f"LED controller initialized with {self.num_pixels} pixels on pin {self.pin} using rpi_ws281x")
         except Exception as e:
             self.logger.error(f"Failed to initialize LED controller: {e}")
             raise
