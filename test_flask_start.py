@@ -16,8 +16,11 @@ os.environ['FLASK_PORT'] = '5001'
 try:
     from app import app
     print("Flask app imported successfully")
-    print("Starting Flask on 0.0.0.0:5001")
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    port = app.config.get('PORT', 5001)
+    host = app.config.get('HOST', '0.0.0.0')
+    debug = app.config.get('DEBUG', True)
+    print(f"Starting Flask on {host}:{port}")
+    app.run(host=host, port=port, debug=debug)
 except Exception as e:
     print(f"Error: {e}")
     import traceback
