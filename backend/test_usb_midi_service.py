@@ -11,12 +11,10 @@ class TestUSBMIDIInputService(unittest.TestCase):
         """Set up test fixtures"""
         self.mock_led_controller = Mock()
         self.mock_websocket_callback = Mock()
-        self.num_leds = 88
         
         self.service = USBMIDIInputService(
             led_controller=self.mock_led_controller,
-            websocket_callback=self.mock_websocket_callback,
-            num_leds=self.num_leds
+            websocket_callback=self.mock_websocket_callback
         )
         # Reset event count for clean test state
         self.service._event_count = 0

@@ -26,8 +26,7 @@ class TestMIDIIntegration(unittest.TestCase):
         # Create USB MIDI service
         self.usb_midi_service = USBMIDIInputService(
             led_controller=self.mock_led_controller,
-            websocket_callback=lambda event_type, data: self.websocket_events.append({'name': event_type, 'args': [data]}),
-            num_leds=88
+            websocket_callback=lambda event_type, data: self.websocket_events.append({'name': event_type, 'args': [data]})
         )
         
         # Set up routes and WebSocket handlers

@@ -46,6 +46,18 @@ except ImportError as e:
     logger.warning(f"USB MIDI service import failed: {e}")
     USBMIDIInputService = None
 
+try:
+    from midi_input_manager import MIDIInputManager
+except ImportError as e:
+    logger.warning(f"MIDI input manager import failed: {e}")
+    MIDIInputManager = None
+
+try:
+    from rtpmidi_service import RtpMIDIService
+except ImportError as e:
+    logger.warning(f"rtpMIDI service import failed: {e}")
+    RtpMIDIService = None
+
 # Configuration
 app.config['DEBUG'] = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
 app.config['HOST'] = os.environ.get('FLASK_HOST', '0.0.0.0')
@@ -126,20 +138,26 @@ else:
     logger.info("Playback service not available (import failed)")
     playback_service = None
 
-# Initialize USB MIDI input service
-if USBMIDIInputService:
+# Initialize Unified MIDI Input Manager
+if MIDIInputManager:
     try:
-        usb_midi_service = USBMIDIInputService(
-            led_controller=led_controller, 
+        midi_input_manager = MIDIInputManager(
             websocket_callback=lambda event_type, data: socketio.emit(event_type, data)
-        )  # Uses configuration values
-        logger.info(f"USB MIDI input service initialized successfully with configuration")
+        )
+        # Initialize the services within the manager
+        if midi_input_manager.initialize_services():
+            logger.info("Unified MIDI input manager initialized successfully")
+        else:
+            logger.warning("MIDI input manager initialized but no services available")
     except Exception as e:
-        logger.warning(f"USB MIDI input service initialization failed: {e}")
-        usb_midi_service = None
+        logger.warning(f"MIDI input manager initialization failed: {e}")
+        midi_input_manager = None
 else:
-    logger.info("USB MIDI input service not available (import failed)")
-    usb_midi_service = None
+    logger.info("MIDI input manager not available (import failed)")
+    midi_input_manager = None
+
+# Keep USB MIDI service reference for backward compatibility
+usb_midi_service = midi_input_manager._usb_service if midi_input_manager else None
 
 @app.route('/')
 def hello_world():
@@ -1140,21 +1158,21 @@ def update_settings():
             'message': 'An unexpected error occurred while updating settings'
         }), 500
 
-# USB MIDI Input API Endpoints
+# Unified MIDI Input API Endpoints (USB + rtpMIDI)
 @app.route('/api/midi-input/devices', methods=['GET'])
 def get_midi_devices():
-    """Get available MIDI input devices"""
+    """Get available MIDI input devices (USB and network)"""
     try:
-        if not usb_midi_service:
+        if not midi_input_manager:
             return jsonify({
                 'error': 'Service Unavailable',
-                'message': 'USB MIDI input service not available'
+                'message': 'MIDI input manager not available'
             }), 503
         
-        devices = usb_midi_service.get_available_devices()
+        devices = midi_input_manager.get_available_devices()
         return jsonify({
             'status': 'success',
-            'devices': [device.__dict__ for device in devices]
+            'devices': devices
         }), 200
         
     except Exception as e:
@@ -1166,24 +1184,30 @@ def get_midi_devices():
 
 @app.route('/api/midi-input/start', methods=['POST'])
 def start_midi_input():
-    """Start MIDI input listening"""
+    """Start MIDI input listening (USB and/or network)"""
     try:
-        if not usb_midi_service:
+        if not midi_input_manager:
             return jsonify({
                 'error': 'Service Unavailable',
-                'message': 'USB MIDI input service not available'
+                'message': 'MIDI input manager not available'
             }), 503
         
         data = request.get_json() or {}
         device_name = data.get('device_name')
+        enable_usb = data.get('enable_usb', True)
+        enable_rtpmidi = data.get('enable_rtpmidi', True)
         
-        success = usb_midi_service.start_listening(device_name)
+        success = midi_input_manager.start_listening(
+            device_name=device_name,
+            enable_usb=enable_usb,
+            enable_rtpmidi=enable_rtpmidi
+        )
         
         if success:
             return jsonify({
                 'status': 'success',
                 'message': 'MIDI input started successfully',
-                'device': usb_midi_service.current_device
+                'services': midi_input_manager.get_active_services()
             }), 200
         else:
             return jsonify({
@@ -1200,15 +1224,15 @@ def start_midi_input():
 
 @app.route('/api/midi-input/stop', methods=['POST'])
 def stop_midi_input():
-    """Stop MIDI input listening"""
+    """Stop MIDI input listening (USB and network)"""
     try:
-        if not usb_midi_service:
+        if not midi_input_manager:
             return jsonify({
                 'error': 'Service Unavailable',
-                'message': 'USB MIDI input service not available'
+                'message': 'MIDI input manager not available'
             }), 503
         
-        success = usb_midi_service.stop_listening()
+        success = midi_input_manager.stop_listening()
         
         if success:
             return jsonify({
@@ -1230,15 +1254,15 @@ def stop_midi_input():
 
 @app.route('/api/midi-input/status', methods=['GET'])
 def get_midi_input_status():
-    """Get MIDI input service status"""
+    """Get unified MIDI input status (USB and network)"""
     try:
-        if not usb_midi_service:
+        if not midi_input_manager:
             return jsonify({
                 'error': 'Service Unavailable',
-                'message': 'USB MIDI input service not available'
+                'message': 'MIDI input manager not available'
             }), 503
         
-        status = usb_midi_service.get_status()
+        status = midi_input_manager.get_status()
         return jsonify({
             'status': 'success',
             'midi_input': status
@@ -1249,6 +1273,110 @@ def get_midi_input_status():
         return jsonify({
             'error': 'Internal Server Error',
             'message': 'An unexpected error occurred while getting MIDI input status'
+        }), 500
+
+# rtpMIDI Network-specific API Endpoints
+@app.route('/api/rtpmidi/sessions', methods=['GET'])
+def get_rtpmidi_sessions():
+    """Get available rtpMIDI sessions"""
+    try:
+        if not midi_input_manager or not midi_input_manager._rtpmidi_service:
+            return jsonify({
+                'error': 'Service Unavailable',
+                'message': 'rtpMIDI service not available'
+            }), 503
+        
+        sessions = midi_input_manager._rtpmidi_service.get_available_sessions()
+        return jsonify({
+            'status': 'success',
+            'sessions': sessions
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting rtpMIDI sessions: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred while getting rtpMIDI sessions'
+        }), 500
+
+@app.route('/api/rtpmidi/connect', methods=['POST'])
+def connect_rtpmidi_session():
+    """Connect to an rtpMIDI session"""
+    try:
+        if not midi_input_manager or not midi_input_manager._rtpmidi_service:
+            return jsonify({
+                'error': 'Service Unavailable',
+                'message': 'rtpMIDI service not available'
+            }), 503
+        
+        data = request.get_json() or {}
+        session_name = data.get('session_name')
+        host = data.get('host')
+        port = data.get('port', 5004)
+        
+        if not session_name or not host:
+            return jsonify({
+                'error': 'Bad Request',
+                'message': 'session_name and host are required'
+            }), 400
+        
+        success = midi_input_manager._rtpmidi_service.connect_session(session_name, host, port)
+        
+        if success:
+            return jsonify({
+                'status': 'success',
+                'message': f'Connected to rtpMIDI session {session_name}'
+            }), 200
+        else:
+            return jsonify({
+                'error': 'Connection Failed',
+                'message': f'Could not connect to rtpMIDI session {session_name}'
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Error connecting to rtpMIDI session: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred while connecting to rtpMIDI session'
+        }), 500
+
+@app.route('/api/rtpmidi/disconnect', methods=['POST'])
+def disconnect_rtpmidi_session():
+    """Disconnect from an rtpMIDI session"""
+    try:
+        if not midi_input_manager or not midi_input_manager._rtpmidi_service:
+            return jsonify({
+                'error': 'Service Unavailable',
+                'message': 'rtpMIDI service not available'
+            }), 503
+        
+        data = request.get_json() or {}
+        session_name = data.get('session_name')
+        
+        if not session_name:
+            return jsonify({
+                'error': 'Bad Request',
+                'message': 'session_name is required'
+            }), 400
+        
+        success = midi_input_manager._rtpmidi_service.disconnect_session(session_name)
+        
+        if success:
+            return jsonify({
+                'status': 'success',
+                'message': f'Disconnected from rtpMIDI session {session_name}'
+            }), 200
+        else:
+            return jsonify({
+                'error': 'Disconnection Failed',
+                'message': f'Could not disconnect from rtpMIDI session {session_name}'
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Error disconnecting from rtpMIDI session: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred while disconnecting from rtpMIDI session'
         }), 500
 
 @app.route('/api/dashboard', methods=['GET'])
@@ -1695,25 +1823,29 @@ def handle_get_status():
 
 @socketio.on('midi_input_start')
 def handle_midi_input_start(data):
-    """Handle WebSocket request to start MIDI input"""
+    """Handle WebSocket request to start MIDI input (USB and/or network)"""
     try:
-        if not usb_midi_service:
-            emit('error', {'message': 'USB MIDI service not available'})
+        if not midi_input_manager:
+            emit('error', {'message': 'MIDI input manager not available'})
             return
             
         device_name = data.get('device_name')
-        if not device_name:
-            emit('error', {'message': 'Device name is required'})
-            return
+        enable_usb = data.get('enable_usb', True)
+        enable_rtpmidi = data.get('enable_rtpmidi', True)
             
-        success = usb_midi_service.start_input(device_name)
+        success = midi_input_manager.start_listening(
+            device_name=device_name,
+            enable_usb=enable_usb,
+            enable_rtpmidi=enable_rtpmidi
+        )
         if success:
             emit('midi_input_started', {
                 'device_name': device_name,
-                'message': f'MIDI input started on {device_name}'
+                'services': midi_input_manager.get_active_services(),
+                'message': 'MIDI input started successfully'
             })
         else:
-            emit('error', {'message': f'Failed to start MIDI input on {device_name}'})
+            emit('error', {'message': 'Failed to start MIDI input'})
             
     except Exception as e:
         logger.error(f"Error in WebSocket MIDI input start: {e}")
@@ -1721,13 +1853,13 @@ def handle_midi_input_start(data):
 
 @socketio.on('midi_input_stop')
 def handle_midi_input_stop():
-    """Handle WebSocket request to stop MIDI input"""
+    """Handle WebSocket request to stop MIDI input (USB and network)"""
     try:
-        if not usb_midi_service:
-            emit('error', {'message': 'USB MIDI service not available'})
+        if not midi_input_manager:
+            emit('error', {'message': 'MIDI input manager not available'})
             return
             
-        usb_midi_service.stop_input()
+        midi_input_manager.stop_listening()
         emit('midi_input_stopped', {
             'message': 'MIDI input stopped successfully'
         })
@@ -1738,16 +1870,16 @@ def handle_midi_input_stop():
 
 @socketio.on('get_midi_devices')
 def handle_get_midi_devices():
-    """Handle WebSocket request for available MIDI devices"""
+    """Handle WebSocket request for available MIDI devices (USB and network)"""
     try:
-        if not usb_midi_service:
-            emit('error', {'message': 'USB MIDI service not available'})
+        if not midi_input_manager:
+            emit('error', {'message': 'MIDI input manager not available'})
             return
             
-        devices = usb_midi_service.get_available_devices()
+        devices = midi_input_manager.get_available_devices()
         emit('midi_devices', {
             'devices': devices,
-            'count': len(devices)
+            'count': len(devices.get('usb_devices', [])) + len(devices.get('rtpmidi_sessions', []))
         })
         
     except Exception as e:
