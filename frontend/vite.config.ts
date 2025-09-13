@@ -6,6 +6,11 @@ const BACKEND_PORT = process.env.VITE_BACKEND_PORT || process.env.FLASK_PORT || 
 const BACKEND_HOST = process.env.VITE_BACKEND_HOST || 'localhost';
 const backendTarget = `http://${BACKEND_HOST}:${BACKEND_PORT}`;
 
+console.log('Vite proxy configuration:');
+console.log('BACKEND_HOST:', BACKEND_HOST);
+console.log('BACKEND_PORT:', BACKEND_PORT);
+console.log('backendTarget:', backendTarget);
+
 export default defineConfig({
 	plugins: [sveltekit()],
 	server: {
