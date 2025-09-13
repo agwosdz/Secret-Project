@@ -5,7 +5,7 @@
 	const dispatch = createEventDispatcher();
 
 	interface MidiDevice {
-		id: string;
+		id: number;
 		name: string;
 		status: 'available' | 'connected' | 'error';
 		type: 'usb' | 'network';
@@ -17,7 +17,7 @@
 		total_count: number;
 	}
 
-	export let selectedDevice: string | null = null;
+	export let selectedDevice: number | null = null;
 	export let autoRefresh = true;
 	export let refreshInterval = 5000;
 
@@ -28,7 +28,6 @@
 	});
 	let loading = false;
 	let error: string | null = null;
-	let debugInfo = '';
 	let refreshTimer: NodeJS.Timeout | null = null;
 
 	onMount(() => {
@@ -51,18 +50,12 @@
 		try {
 			// Use direct backend URL since proxy might not be working
 			const backendUrl = 'http://192.168.1.225:5001';
-			debugInfo = `Fetching from: ${backendUrl}/api/midi-input/devices`;
-			console.log('Fetching devices from:', `${backendUrl}/api/midi-input/devices`);
 			const response = await fetch(`${backendUrl}/api/midi-input/devices`);
-			debugInfo += `\nResponse: ${response.status} ${response.statusText}`;
-			console.log('Response status:', response.status, response.statusText);
 			if (!response.ok) {
 				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 			}
 
 			const response_data = await response.json();
-			debugInfo += `\nRaw response: ${JSON.stringify(response_data, null, 2)}`;
-			console.log('Raw response:', response_data);
 			// Extract devices from the backend response format
 			const devices_data = response_data.devices || response_data;
 			// Ensure the response has the expected structure
@@ -71,11 +64,7 @@
 				rtpmidi_sessions: devices_data.rtpmidi_sessions || [],
 				total_count: (devices_data.usb_devices?.length || 0) + (devices_data.rtpmidi_sessions?.length || 0)
 			};
-			debugInfo += `\nExtracted devices: ${JSON.stringify(safeData, null, 2)}`;
-			console.log('Extracted devices:', safeData);
 			devices.set(safeData);
-			debugInfo += `\nDevices store updated successfully`;
-			console.log('Devices store updated successfully');
 			dispatch('devicesUpdated', safeData);
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to fetch devices';
@@ -228,13 +217,7 @@
 		</div>
 	{/if}
 
-	<!-- Debug Information -->
-	{#if debugInfo}
-		<div class="debug-info">
-			<h4>Debug Info:</h4>
-			<pre>{debugInfo}</pre>
-		</div>
-	{/if}
+
 </div>
 
 <style>

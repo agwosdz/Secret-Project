@@ -386,7 +386,7 @@
 	// MIDI device event handlers
 	function handleMidiDeviceSelected(event) {
 		console.log('MIDI device selected:', event.detail);
-		selectedMidiDevice = event.detail;
+		selectedMidiDevice = event.detail.id;
 	}
 
 	function handleMidiDevicesUpdated(event) {
