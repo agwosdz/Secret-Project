@@ -105,6 +105,10 @@ class MIDIInputManager:
         }
         
         self.logger.info("Unified MIDI Input Manager initialized")
+        # Send initial status broadcast
+        self.logger.info("Broadcasting initial status update...")
+        self._broadcast_status_update()
+        self.logger.info("Initial status broadcast completed")
     
     @property
     def is_listening(self) -> bool:
@@ -457,10 +461,36 @@ class MIDIInputManager:
         """Broadcast unified status update via WebSocket"""
         if self._websocket_callback:
             try:
-                self._websocket_callback('midi_manager_status', {
+                self.logger.info("Broadcasting MIDI manager status update...")
+                # Get detailed status from services
+                usb_status = {}
+                rtpmidi_status = {}
+                
+                if self._usb_service:
+                    usb_service_status = self._usb_service.get_status()
+                    usb_status = {
+                        'connected': usb_service_status.get('is_listening', False),
+                        'device_name': usb_service_status.get('device'),
+                        'listening': usb_service_status.get('is_listening', False),
+                        'available': self._source_status[MIDIInputSource.USB].get('available', False)
+                    }
+                    self.logger.info(f"USB status: {usb_status}")
+                
+                if self._rtpmidi_service:
+                    rtpmidi_service_status = self._rtpmidi_service.get_status()
+                    active_sessions = rtpmidi_service_status.get('active_sessions', {})
+                    rtpmidi_status = {
+                        'connected': len(active_sessions) > 0,
+                        'active_sessions': list(active_sessions.values()) if active_sessions else [],
+                        'listening': rtpmidi_service_status.get('running', False),
+                        'available': self._source_status[MIDIInputSource.RTPMIDI].get('available', False)
+                    }
+                
+                status_data = {
                     'running': self._running,
                     'sources': {
-                        source.value: status for source, status in self._source_status.items()
+                        'USB': usb_status,
+                        'RTP_MIDI': rtpmidi_status
                     },
                     'active_notes': len(self._active_notes),
                     'event_counts': {
@@ -471,7 +501,10 @@ class MIDIInputManager:
                         'duplicate_events_filtered': self._duplicate_events_filtered,
                         'buffer_size': len(self._event_buffer)
                     }
-                })
+                }
+                self.logger.info(f"Sending midi_manager_status: {status_data}")
+                self._websocket_callback('midi_manager_status', status_data)
+                self.logger.info("WebSocket callback completed")
             except Exception as e:
                 self.logger.error(f"Error broadcasting status update: {e}")
     

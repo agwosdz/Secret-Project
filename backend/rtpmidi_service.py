@@ -544,10 +544,29 @@ class RtpMIDIService:
         """Broadcast service status update via WebSocket"""
         if self._websocket_callback:
             try:
+                # Send detailed status for manager consumption
                 self._websocket_callback('rtpmidi_status', {
                     'state': self._state.value,
-                    'active_sessions': len(self._active_sessions),
-                    'discovered_sessions': len(self._discovered_sessions),
+                    'running': self._running,
+                    'active_sessions': {
+                        name: {
+                            'name': session.name,
+                            'ip_address': session.ip_address,
+                            'port': session.port,
+                            'status': session.status,
+                            'latency': session.latency,
+                            'packet_loss': session.packet_loss,
+                            'connected_at': session.connected_at
+                        } for name, session in self._active_sessions.items()
+                    },
+                    'discovered_sessions': {
+                        name: {
+                            'name': session.name,
+                            'ip_address': session.ip_address,
+                            'port': session.port,
+                            'status': session.status
+                        } for name, session in self._discovered_sessions.items()
+                    },
                     'event_count': self._event_count,
                     'last_event_time': self._last_event_time
                 })

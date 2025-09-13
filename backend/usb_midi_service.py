@@ -530,6 +530,14 @@ class USBMIDIInputService:
                     'last_event_time': self._last_event_time
                 }
                 self._websocket_callback('midi_input_status', status_data)
+                
+                # Also notify the manager about device status changes
+                self._websocket_callback('device_status', {
+                    'device': self._current_device,
+                    'state': self._state.value,
+                    'is_listening': self.is_listening,
+                    'devices': [d.__dict__ for d in self.get_available_devices()]
+                })
             except Exception as e:
                 self.logger.error(f"Error broadcasting status update: {e}")
     

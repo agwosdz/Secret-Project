@@ -1798,6 +1798,8 @@ def handle_disconnect():
 @socketio.on('get_status')
 def handle_get_status():
     """Handle request for current playback status"""
+    print("DEBUG: get_status event received")
+    
     if playback_service:
         status = playback_service.get_status()
         emit('playback_status', {
@@ -1815,11 +1817,17 @@ def handle_get_status():
     if usb_midi_service:
         midi_status = usb_midi_service.get_status()
         emit('midi_input_status', {
-            'active': midi_status['active'],
+            'connected': midi_status.get('connected', False),
             'device_name': midi_status.get('device_name'),
             'notes_received': midi_status.get('notes_received', 0),
             'error_message': midi_status.get('error_message')
         })
+    
+    # Also emit MIDI manager status
+    if midi_input_manager:
+        print("DEBUG: Broadcasting MIDI manager status via get_status")
+        midi_input_manager._broadcast_status_update()
+        print("DEBUG: MIDI manager status broadcast completed")
 
 @socketio.on('midi_input_start')
 def handle_midi_input_start(data):
