@@ -291,21 +291,28 @@ class USBMIDIInputService:
             msg: MIDI message from mido
         """
         try:
+            # DEBUG: Log all incoming MIDI messages
+            self.logger.info(f"MIDI DEBUG: Received message: {msg} (type={msg.type}, channel={getattr(msg, 'channel', 'N/A')})")
+            
             current_time = time.time()
             self._event_count += 1
             self._last_event_time = current_time
             
             # Process note on events
             if msg.type == 'note_on' and msg.velocity > 0:
+                self.logger.info(f"MIDI DEBUG: Note ON - {msg.note}, velocity={msg.velocity}, active notes: {sorted(self._active_notes.keys())}")
                 self._handle_note_on(msg.note, msg.velocity, msg.channel, current_time)
             
             # Process note off events (including note_on with velocity 0)
             elif msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0):
+                self.logger.info(f"MIDI DEBUG: Note OFF - {msg.note}, active notes: {sorted(self._active_notes.keys())}")
                 self._handle_note_off(msg.note, msg.channel, current_time)
             
-            # Log other MIDI events for debugging (optional)
+            # Log other MIDI events for debugging
             elif msg.type in ['control_change', 'program_change', 'pitchwheel']:
-                self.logger.debug(f"MIDI {msg.type}: {msg}")
+                self.logger.info(f"MIDI DEBUG: {msg.type}: {msg}")
+            else:
+                self.logger.info(f"MIDI DEBUG: Other message type: {msg}")
                 
         except Exception as e:
             self.logger.error(f"Error processing MIDI message {msg}: {e}")
