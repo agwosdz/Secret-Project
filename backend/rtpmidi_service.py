@@ -573,6 +573,37 @@ class RtpMIDIService:
             except Exception as e:
                 self.logger.error(f"Error broadcasting status update: {e}")
     
+    def get_available_sessions(self) -> List[Dict[str, Any]]:
+        """Get list of available rtpMIDI sessions (both active and discovered)"""
+        sessions = []
+        
+        # Add active sessions
+        for name, session in self._active_sessions.items():
+            sessions.append({
+                'name': session.name,
+                'ip_address': session.ip_address,
+                'port': session.port,
+                'status': 'active',
+                'latency': session.latency,
+                'packet_loss': session.packet_loss,
+                'connected_at': session.connected_at
+            })
+        
+        # Add discovered sessions that are not already active
+        for name, session in self._discovered_sessions.items():
+            if name not in self._active_sessions:
+                sessions.append({
+                    'name': session.name,
+                    'ip_address': session.ip_address,
+                    'port': session.port,
+                    'status': 'discovered',
+                    'latency': 0.0,
+                    'packet_loss': 0.0,
+                    'connected_at': None
+                })
+        
+        return sessions
+    
     def get_status(self) -> Dict[str, Any]:
         """Get comprehensive service status"""
         return {
