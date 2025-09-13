@@ -43,6 +43,41 @@
 		{/if}
 	</div>
 
+	<div class="navigation-card">
+		<h2>Navigation</h2>
+		<p>Access all available features of the Piano LED Visualizer:</p>
+		<div class="nav-buttons">
+			<a href="/dashboard" class="nav-button primary">
+				<span class="nav-icon">📊</span>
+				<div class="nav-content">
+					<h3>Dashboard</h3>
+					<p>Monitor system status and control LED visualizations</p>
+				</div>
+			</a>
+			<a href="/upload" class="nav-button">
+				<span class="nav-icon">📁</span>
+				<div class="nav-content">
+					<h3>Upload</h3>
+					<p>Upload MIDI files for LED visualization</p>
+				</div>
+			</a>
+			<a href="/play" class="nav-button">
+				<span class="nav-icon">▶️</span>
+				<div class="nav-content">
+					<h3>Play</h3>
+					<p>Play and control MIDI file playback</p>
+				</div>
+			</a>
+			<a href="/settings" class="nav-button">
+				<span class="nav-icon">⚙️</span>
+				<div class="nav-content">
+					<h3>Settings</h3>
+					<p>Configure system preferences and LED settings</p>
+				</div>
+			</a>
+		</div>
+	</div>
+
 	<div class="info-card">
 		<h2>Getting Started</h2>
 		<p>This is the foundation setup for the Piano LED Visualizer. The system is ready for development!</p>
@@ -70,7 +105,7 @@
 		font-size: 2.5rem;
 	}
 
-	.status-card, .info-card {
+	.status-card, .info-card, .navigation-card {
 		background: #f8f9fa;
 		border: 1px solid #e9ecef;
 		border-radius: 8px;
@@ -125,5 +160,79 @@
 	li {
 		padding: 0.5rem 0;
 		font-size: 1.1rem;
+	}
+
+	.nav-buttons {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+		gap: 1rem;
+		margin-top: 1rem;
+	}
+
+	.nav-button {
+		display: flex;
+		align-items: center;
+		padding: 1.25rem;
+		background: white;
+		border: 2px solid #e9ecef;
+		border-radius: 8px;
+		text-decoration: none;
+		color: inherit;
+		transition: all 0.2s ease;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	}
+
+	.nav-button:hover {
+		transform: translateY(-2px);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+		border-color: #007bff;
+	}
+
+	.nav-button.primary {
+		border-color: #007bff;
+		background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+		color: white;
+	}
+
+	.nav-button.primary:hover {
+		background: linear-gradient(135deg, #0056b3 0%, #004085 100%);
+	}
+
+	.nav-icon {
+		font-size: 2rem;
+		margin-right: 1rem;
+		flex-shrink: 0;
+	}
+
+	.nav-content h3 {
+		margin: 0 0 0.5rem 0;
+		font-size: 1.25rem;
+		font-weight: 600;
+	}
+
+	.nav-content p {
+		margin: 0;
+		font-size: 0.9rem;
+		opacity: 0.8;
+		line-height: 1.4;
+	}
+
+	.nav-button.primary .nav-content p {
+		opacity: 0.9;
+	}
+
+	@media (max-width: 640px) {
+		.nav-buttons {
+			grid-template-columns: 1fr;
+		}
+		
+		.nav-button {
+			padding: 1rem;
+		}
+		
+		.nav-icon {
+			font-size: 1.5rem;
+			margin-right: 0.75rem;
+		}
 	}
 </style>

@@ -54,8 +54,14 @@
 			}
 
 			const data: DeviceResponse = await response.json();
-			devices.set(data);
-			dispatch('devicesUpdated', data);
+			// Ensure the response has the expected structure
+			const safeData: DeviceResponse = {
+				usb_devices: data.usb_devices || [],
+				rtpmidi_sessions: data.rtpmidi_sessions || [],
+				total_count: data.total_count || 0
+			};
+			devices.set(safeData);
+			dispatch('devicesUpdated', safeData);
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to fetch devices';
 			console.error('Error fetching MIDI devices:', err);
@@ -94,7 +100,7 @@
 		return type === 'usb' ? '🔌' : '🌐';
 	}
 
-	$: allDevices = [...$devices.usb_devices, ...$devices.rtpmidi_sessions];
+	$: allDevices = [...($devices.usb_devices || []), ...($devices.rtpmidi_sessions || [])];
 </script>
 
 <div class="midi-device-selector">
@@ -135,7 +141,7 @@
 	{/if}
 
 	<div class="device-sections">
-		{#if $devices.usb_devices.length > 0}
+		{#if $devices.usb_devices && $devices.usb_devices.length > 0}
 			<div class="device-section">
 				<h4>🔌 USB Devices ({$devices.usb_devices.length})</h4>
 				<div class="device-list">
@@ -161,7 +167,7 @@
 			</div>
 		{/if}
 
-		{#if $devices.rtpmidi_sessions.length > 0}
+		{#if $devices.rtpmidi_sessions && $devices.rtpmidi_sessions.length > 0}
 			<div class="device-section">
 				<h4>🌐 Network Devices ({$devices.rtpmidi_sessions.length})</h4>
 				<div class="device-list">
