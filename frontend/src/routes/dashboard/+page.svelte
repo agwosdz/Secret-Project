@@ -3,6 +3,9 @@
 	import LEDVisualization from '$lib/components/LEDVisualization.svelte';
 	import DashboardControls from '$lib/components/DashboardControls.svelte';
 	import PerformanceMonitor from '$lib/components/PerformanceMonitor.svelte';
+	import MidiDeviceSelector from '$lib/components/MidiDeviceSelector.svelte';
+	import NetworkMidiConfig from '$lib/components/NetworkMidiConfig.svelte';
+	import MidiConnectionStatus from '$lib/components/MidiConnectionStatus.svelte';
 	
 	// Visualization toggle
 	let visualizationEnabled = true;
@@ -34,6 +37,26 @@
 	let updateCount = 0;
 	let fpsInterval;
 	let connectionHealthInterval;
+
+	// MIDI device management
+	let selectedMidiDevice = null;
+	let midiDevicesExpanded = false;
+	let networkMidiExpanded = false;
+
+	// MIDI connection status
+	let usbMidiStatus = {
+		connected: false,
+		deviceName: null,
+		lastActivity: null,
+		messageCount: 0
+	};
+
+	let networkMidiStatus = {
+		connected: false,
+		activeSessions: [],
+		lastActivity: null,
+		messageCount: 0
+	};
 
 	// Initialize LED state with default values
 	function initializeLEDState(count) {
@@ -360,6 +383,45 @@
 		}
 	}
 
+	// MIDI device event handlers
+	function handleMidiDeviceSelected(event) {
+		console.log('MIDI device selected:', event.detail);
+		selectedMidiDevice = event.detail;
+	}
+
+	function handleMidiDevicesUpdated(event) {
+		console.log('MIDI devices updated:', event.detail);
+	}
+
+	function handleNetworkMidiConnected(event) {
+		console.log('Network MIDI session connected:', event.detail);
+	}
+
+	function handleNetworkMidiDisconnected(event) {
+		console.log('Network MIDI session disconnected:', event.detail);
+	}
+
+	function handleNetworkMidiSessionsUpdated(event) {
+		console.log('Network MIDI sessions updated:', event.detail);
+	}
+
+	// MIDI connection status event handlers
+	function handleMidiStatusConnected(event) {
+		console.log('MIDI status WebSocket connected');
+	}
+
+	function handleMidiStatusDisconnected(event) {
+		console.log('MIDI status WebSocket disconnected');
+	}
+
+	function handleUsbStatusUpdate(event) {
+		usbMidiStatus = event.detail;
+	}
+
+	function handleNetworkStatusUpdate(event) {
+		networkMidiStatus = event.detail;
+	}
+
 	// Helper functions for system status display
 	function getStatusClass(available) {
 		return available ? 'healthy' : 'error';
@@ -442,6 +504,20 @@
 	<main class="dashboard-main">
 		<section class="system-status-section">
 			<h2>System Status</h2>
+			
+			<!-- MIDI Connection Status -->
+			<div class="midi-status-container">
+				<h3>🎹 MIDI Connection Status</h3>
+				<MidiConnectionStatus 
+					{usbMidiStatus}
+					{networkMidiStatus}
+					on:connected={handleMidiStatusConnected}
+					on:disconnected={handleMidiStatusDisconnected}
+					on:usbStatusUpdate={handleUsbStatusUpdate}
+					on:networkStatusUpdate={handleNetworkStatusUpdate}
+				/>
+			</div>
+
 			{#if systemStatusLoading}
 				<div class="loading">Loading system status...</div>
 			{:else if systemStatusError}
@@ -526,6 +602,47 @@
 					</div>
 				</div>
 			{/if}
+		</section>
+
+		<section class="midi-management-section">
+			<h2>🎹 MIDI Device Management</h2>
+			<div class="midi-panels">
+				<div class="midi-panel">
+					<div class="panel-header" on:click={() => midiDevicesExpanded = !midiDevicesExpanded}>
+						<h3>Device Selection</h3>
+						<span class="expand-icon {midiDevicesExpanded ? 'expanded' : ''}">
+							{midiDevicesExpanded ? '▼' : '▶'}
+						</span>
+					</div>
+					{#if midiDevicesExpanded}
+						<div class="panel-content">
+							<MidiDeviceSelector 
+								bind:selectedDevice={selectedMidiDevice}
+								on:deviceSelected={handleMidiDeviceSelected}
+								on:devicesUpdated={handleMidiDevicesUpdated}
+							/>
+						</div>
+					{/if}
+				</div>
+
+				<div class="midi-panel">
+					<div class="panel-header" on:click={() => networkMidiExpanded = !networkMidiExpanded}>
+						<h3>Network MIDI</h3>
+						<span class="expand-icon {networkMidiExpanded ? 'expanded' : ''}">
+							{networkMidiExpanded ? '▼' : '▶'}
+						</span>
+					</div>
+					{#if networkMidiExpanded}
+						<div class="panel-content">
+							<NetworkMidiConfig 
+								on:sessionConnected={handleNetworkMidiConnected}
+								on:sessionDisconnected={handleNetworkMidiDisconnected}
+								on:sessionsUpdated={handleNetworkMidiSessionsUpdated}
+							/>
+						</div>
+					{/if}
+				</div>
+			</div>
 		</section>
 
 		<section class="controls-section">
@@ -617,6 +734,97 @@
 		max-width: 300px;
 		min-height: 44px;
 		line-height: 1.4;
+	}
+
+	/* MIDI Management Section */
+	.midi-management-section {
+		margin-bottom: 2rem;
+	}
+
+	.midi-management-section h2 {
+		margin-bottom: 1.5rem;
+		color: #333;
+		font-size: 1.5rem;
+		font-weight: 600;
+	}
+
+	.midi-panels {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 1.5rem;
+	}
+
+	.midi-panel {
+		background: white;
+		border: 1px solid #e0e0e0;
+		border-radius: 12px;
+		overflow: hidden;
+		box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+		transition: box-shadow 0.2s ease;
+	}
+
+	.midi-panel:hover {
+		box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+	}
+
+	.panel-header {
+		padding: 1rem 1.25rem;
+		background: #f8f9fa;
+		border-bottom: 1px solid #e0e0e0;
+		cursor: pointer;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		transition: background-color 0.2s ease;
+	}
+
+	.panel-header:hover {
+		background: #e9ecef;
+	}
+
+	.panel-header h3 {
+		margin: 0;
+		font-size: 1.1rem;
+		font-weight: 600;
+		color: #495057;
+	}
+
+	.expand-icon {
+		font-size: 0.9rem;
+		color: #6c757d;
+		transition: transform 0.2s ease;
+	}
+
+	.expand-icon.expanded {
+		transform: rotate(0deg);
+	}
+
+	.panel-content {
+		padding: 1.25rem;
+	}
+
+	@media (max-width: 768px) {
+		.midi-panels {
+			grid-template-columns: 1fr;
+			gap: 1rem;
+		}
+	}
+
+	/* MIDI Status Container */
+	.midi-status-container {
+		margin-bottom: 2rem;
+		padding: 1.5rem;
+		background: white;
+		border: 1px solid #e0e0e0;
+		border-radius: 12px;
+		box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+	}
+
+	.midi-status-container h3 {
+		margin: 0 0 1rem 0;
+		color: #333;
+		font-size: 1.2rem;
+		font-weight: 600;
 	}
 
 	.error-icon {
