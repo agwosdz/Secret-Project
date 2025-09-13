@@ -1389,8 +1389,23 @@ def api_dashboard():
             'led_controller_available': led_controller is not None,
             'midi_parser_available': midi_parser is not None,
             'playback_service_available': playback_service is not None,
-            'usb_midi_service_available': usb_midi_service is not None
+            'usb_midi_service_available': usb_midi_service is not None,
+            'midi_input_active': False,
+            'midi_device_name': None
         }
+        
+        # Check if MIDI input is actively listening
+        if midi_input_manager:
+            try:
+                manager_status = midi_input_manager.get_status()
+                system_status['midi_input_active'] = manager_status.get('is_listening', False)
+                
+                # Get active device name if available
+                usb_status = manager_status.get('usb_service', {})
+                if usb_status.get('device'):
+                    system_status['midi_device_name'] = usb_status['device']
+            except Exception as e:
+                logger.warning(f"Error getting MIDI input manager status: {e}")
         
         # Get playback status if available
         playback_status = None

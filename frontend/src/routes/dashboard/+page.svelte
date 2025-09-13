@@ -354,8 +354,18 @@
 			if (response.ok) {
 				systemStatus = await response.json();
 				systemStatusError = null;
+				
+				// Initialize MIDI status based on system status
+				if (systemStatus.system_status) {
+					usbMidiStatus = {
+						connected: systemStatus.system_status.midi_input_active || false,
+						deviceName: systemStatus.system_status.midi_device_name || null,
+						lastActivity: null,
+						messageCount: 0
+					};
+				}
 			} else {
-				systemStatusError = `HTTP ${response.status}: ${response.statusText}`;
+				systemStatusError = `HTTP ${response.status}: ${response.status}`;
 			}
 		} catch (error) {
 			systemStatusError = 'Cannot connect to backend server';
