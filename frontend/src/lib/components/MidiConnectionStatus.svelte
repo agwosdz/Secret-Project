@@ -1,6 +1,7 @@
 <script>
 	import { onMount, onDestroy } from 'svelte';
 	import { createEventDispatcher } from 'svelte';
+	import { io } from 'socket.io-client';
 
 	const dispatch = createEventDispatcher();
 
@@ -19,47 +20,88 @@
 		messageCount: 0
 	};
 
-	// WebSocket connection for real-time updates
-	let ws = null;
+	// Socket.IO connection for real-time updates
+	let socket = null;
 	let reconnectInterval = null;
 	let connectionAttempts = 0;
 	const maxReconnectAttempts = 5;
 
-	function connectWebSocket() {
-		if (ws && ws.readyState === WebSocket.OPEN) return;
+	function connectSocket() {
+		if (socket && socket.connected) return;
 
 		try {
-			const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-			const wsUrl = `${protocol}//${window.location.host}/ws/midi-status`;
-			ws = new WebSocket(wsUrl);
+			// Use the backend host from environment variables or default to current host
+			const backendHost = import.meta.env.VITE_BACKEND_HOST || window.location.hostname;
+			const backendPort = import.meta.env.VITE_BACKEND_PORT || '5001';
+			const socketUrl = `http://${backendHost}:${backendPort}`;
+			
+			socket = io(socketUrl, {
+				transports: ['polling', 'websocket'],
+				timeout: 5000,
+				autoConnect: true
+			});
 
-			ws.onopen = () => {
-				console.log('MIDI status WebSocket connected');
+			socket.on('connect', () => {
+				console.log('MIDI status Socket.IO connected');
 				connectionAttempts = 0;
 				dispatch('connected');
-			};
+				// Request current status
+				socket.emit('get_status');
+			});
 
-			ws.onmessage = (event) => {
-				try {
-					const data = JSON.parse(event.data);
-					handleMidiStatusUpdate(data);
-				} catch (error) {
-					console.error('Error parsing MIDI status message:', error);
+			socket.on('midi_input_status', (data) => {
+				handleMidiStatusUpdate({
+					type: 'usb_midi_status',
+					status: {
+						connected: data.active,
+						deviceName: data.device_name,
+						lastActivity: data.last_event_time,
+						messageCount: data.notes_received || 0
+					}
+				});
+			});
+
+			socket.on('midi_manager_status', (data) => {
+				// Handle unified MIDI manager status
+				if (data.sources) {
+					if (data.sources.USB) {
+						handleMidiStatusUpdate({
+							type: 'usb_midi_status',
+							status: {
+								connected: data.sources.USB.connected,
+								deviceName: data.sources.USB.device_name,
+								lastActivity: data.performance?.last_event_time,
+								messageCount: data.event_counts?.USB || 0
+							}
+						});
+					}
+					if (data.sources.RTP_MIDI) {
+						handleMidiStatusUpdate({
+							type: 'network_midi_status',
+							status: {
+								connected: data.sources.RTP_MIDI.connected,
+								activeSessions: data.sources.RTP_MIDI.active_sessions || [],
+								lastActivity: data.performance?.last_event_time,
+								messageCount: data.event_counts?.RTP_MIDI || 0
+							}
+						});
+					}
 				}
-			};
+			});
 
-			ws.onclose = () => {
-				console.log('MIDI status WebSocket disconnected');
+			socket.on('disconnect', (reason) => {
+				console.log('MIDI status Socket.IO disconnected:', reason);
 				dispatch('disconnected');
 				scheduleReconnect();
-			};
+			});
 
-			ws.onerror = (error) => {
-				console.error('MIDI status WebSocket error:', error);
+			socket.on('connect_error', (error) => {
+				console.error('MIDI status Socket.IO error:', error);
 				dispatch('error', { error });
-			};
+				scheduleReconnect();
+			});
 		} catch (error) {
-			console.error('Failed to create MIDI status WebSocket:', error);
+			console.error('Failed to create MIDI status Socket.IO connection:', error);
 			scheduleReconnect();
 		}
 	}
@@ -74,8 +116,8 @@
 		const delay = Math.min(1000 * Math.pow(2, connectionAttempts), 30000);
 		
 		reconnectInterval = setTimeout(() => {
-			console.log(`Attempting to reconnect MIDI status WebSocket (attempt ${connectionAttempts})`);
-			connectWebSocket();
+			console.log(`Attempting to reconnect MIDI status Socket.IO (attempt ${connectionAttempts})`);
+			connectSocket();
 		}, delay);
 	}
 
@@ -111,15 +153,15 @@
 	}
 
 	onMount(() => {
-		connectWebSocket();
+		connectSocket();
 	});
 
 	onDestroy(() => {
 		if (reconnectInterval) {
 			clearTimeout(reconnectInterval);
 		}
-		if (ws) {
-			ws.close();
+		if (socket) {
+			socket.disconnect();
 		}
 	});
 </script>
