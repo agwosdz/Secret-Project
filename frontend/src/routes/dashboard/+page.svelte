@@ -394,9 +394,36 @@
 	}
 
 	// MIDI device event handlers
-	function handleMidiDeviceSelected(event) {
+	async function handleMidiDeviceSelected(event) {
 		console.log('MIDI device selected:', event.detail);
 		selectedMidiDevice = event.detail.id;
+		
+		// Connect to the selected MIDI device
+		try {
+			const response = await fetch('/api/midi-input/start', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					device_name: event.detail.name,
+					enable_usb: true,
+					enable_rtpmidi: false
+				})
+			});
+			
+			if (response.ok) {
+				const result = await response.json();
+				console.log('MIDI device connected successfully:', result);
+				// Refresh system status to update the connection status display
+				await fetchSystemStatus();
+			} else {
+				const error = await response.json();
+				console.error('Failed to connect to MIDI device:', error);
+			}
+		} catch (error) {
+			console.error('Error connecting to MIDI device:', error);
+		}
 	}
 
 	function handleMidiDevicesUpdated(event) {

@@ -219,8 +219,8 @@
 <style>
 	.midi-connection-status {
 		display: flex;
-		gap: 1.5rem;
-		padding: 1rem;
+		gap: 2rem;
+		padding: 1.5rem;
 		background: #f8f9fa;
 		border-radius: 8px;
 		border: 1px solid #e9ecef;
@@ -228,7 +228,8 @@
 
 	.status-section {
 		flex: 1;
-		min-width: 0;
+		min-width: 200px;
+		max-width: 300px;
 	}
 
 	.status-section h3 {
