@@ -9,6 +9,7 @@ from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 import os
 import logging
+import time
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge, BadRequest
 import mimetypes
@@ -1975,6 +1976,77 @@ def handle_get_midi_devices():
     except Exception as e:
         logger.error(f"Error in WebSocket get MIDI devices: {e}")
         emit('error', {'message': f'Failed to get MIDI devices: {str(e)}'})
+
+@socketio.on('unified_midi_event')
+def handle_unified_midi_event(data):
+    """Handle unified MIDI events from MIDI input manager and broadcast as live events"""
+    try:
+        # Transform unified event to live_midi_event for UI
+        live_event = {
+            'timestamp': data.get('timestamp', time.time()),
+            'note': data.get('note'),
+            'velocity': data.get('velocity'),
+            'channel': data.get('channel'),
+            'event_type': data.get('event_type'),
+            'source': data.get('source'),
+            'source_detail': data.get('source_detail')
+        }
+        
+        # Broadcast to all connected clients
+        socketio.emit('live_midi_event', live_event)
+        
+        # Also trigger LED visualization if available
+        if led_controller and data.get('event_type') in ['note_on', 'note_off']:
+            try:
+                if data.get('event_type') == 'note_on':
+                    led_controller.note_on(data.get('note'), data.get('velocity'))
+                else:
+                    led_controller.note_off(data.get('note'))
+            except Exception as led_error:
+                logger.warning(f"LED visualization error: {led_error}")
+                
+    except Exception as e:
+        logger.error(f"Error handling unified MIDI event: {e}")
+
+@socketio.on('rtpmidi_event')
+def handle_rtpmidi_event(data):
+    """Handle rtpMIDI network events and broadcast to all clients"""
+    try:
+        # Transform rtpMIDI event to live_midi_event for UI
+        live_event = {
+            'timestamp': data.get('timestamp', time.time()),
+            'note': data.get('note'),
+            'velocity': data.get('velocity'),
+            'channel': data.get('channel', 1),
+            'event_type': data.get('event_type'),
+            'source': f"network:{data.get('source_session', 'unknown')}"
+        }
+        
+        # Broadcast to all connected clients
+        socketio.emit('live_midi_event', live_event)
+        
+        # Trigger LED visualization if available
+        if led_controller and data.get('event_type') in ['note_on', 'note_off']:
+            try:
+                if data.get('event_type') == 'note_on':
+                    led_controller.note_on(data.get('note'), data.get('velocity'))
+                else:
+                    led_controller.note_off(data.get('note'))
+            except Exception as led_error:
+                logger.warning(f"LED visualization error: {led_error}")
+                
+    except Exception as e:
+        logger.error(f"Error handling rtpMIDI event: {e}")
+
+@socketio.on('rtpmidi_status')
+def handle_rtpmidi_status(data):
+    """Handle rtpMIDI status updates and broadcast to all clients"""
+    try:
+        # Broadcast rtpMIDI status to all connected clients
+        socketio.emit('rtpmidi_status_update', data)
+        
+    except Exception as e:
+        logger.error(f"Error handling rtpMIDI status: {e}")
 
 if __name__ == '__main__':
     print(f"Starting Piano LED Visualizer Backend...")

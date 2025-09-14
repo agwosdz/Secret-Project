@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { browser } from '$app/environment';
+	import { statusManager } from '$lib/statusCommunication';
 
 	// Playback state
 	let playbackState: 'idle' | 'playing' | 'paused' | 'stopped' = 'idle';
@@ -33,6 +34,13 @@
 	let statusInterval: NodeJS.Timeout | null = null;
 	let reconnectAttempts = 0;
 	const maxReconnectAttempts = 5;
+	let connectionStatus = 'disconnected'; // 'connected', 'connecting', 'disconnected', 'polling'
+	
+	// Performance monitoring
+	let midiEventCount = 0;
+	let lastMidiEventTime = 0;
+	let midiEventRate = 0;
+	let performanceMonitorInterval: NodeJS.Timeout | null = null;
 
 	onMount(() => {
 		if (!browser) return;
@@ -55,6 +63,9 @@
 		
 		// Fallback polling in case WebSocket fails
 		startStatusPolling();
+		
+		// Start performance monitoring
+		startPerformanceMonitoring();
 		
 		// Add keyboard shortcuts
 		const handleKeydown = (event) => {
@@ -143,6 +154,9 @@
 		if (statusInterval) {
 			clearInterval(statusInterval);
 		}
+		if (performanceMonitorInterval) {
+			clearInterval(performanceMonitorInterval);
+		}
 		// Clean up keyboard event listeners
 		if (browser && window.keydownCleanup) {
 			window.keydownCleanup();
@@ -159,11 +173,21 @@
 			// Use Socket.IO client if available, otherwise fallback to WebSocket
 			if (typeof io !== 'undefined') {
 				// Socket.IO connection to backend server (use relative path for proxy)
+				connectionStatus = 'connecting';
 				websocket = io();
 				
 				websocket.on('connect', () => {
 					console.log('WebSocket connected');
 					reconnectAttempts = 0;
+					connectionStatus = 'connected';
+					
+					// Show connection success status
+					statusManager.showMessage(
+						'🔗 Real-time connection established',
+						'success',
+						{ duration: 2000 }
+					);
+					
 					// Stop polling when WebSocket is connected
 					if (statusInterval) {
 						clearInterval(statusInterval);
@@ -181,8 +205,17 @@
 					updateExtendedPlaybackState(data);
 				});
 				
-				websocket.on('disconnect', () => {
-					console.log('WebSocket disconnected');
+				websocket.on('disconnect', (reason) => {
+					console.log('WebSocket disconnected:', reason);
+					connectionStatus = 'disconnected';
+					
+					// Show disconnection status
+					statusManager.showMessage(
+						'⚠️ Real-time connection lost - switching to polling',
+						'warning',
+						{ duration: 3000 }
+					);
+					
 					// Resume polling as fallback
 					if (!statusInterval) {
 						startStatusPolling();
@@ -191,10 +224,45 @@
 				
 				websocket.on('error', (error) => {
 					console.error('WebSocket error:', error);
-					// Resume polling as fallback
-					if (!statusInterval) {
-						startStatusPolling();
+					reconnectAttempts++;
+					
+					// Calculate exponential backoff delay (max 30 seconds)
+					const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 30000);
+					
+					if (reconnectAttempts <= 5) {
+						statusManager.showMessage(
+							`🔄 Connection failed - retrying in ${Math.ceil(delay / 1000)}s (${reconnectAttempts}/5)`,
+							'error',
+							{ duration: delay }
+						);
+						
+						// Attempt reconnection with exponential backoff
+						setTimeout(() => {
+							if (websocket && !websocket.connected) {
+								websocket.connect();
+							}
+						}, delay);
+					} else {
+						// Max retries reached - fall back to polling
+						statusManager.showMessage(
+							'❌ Real-time connection failed - using polling mode',
+							'error',
+							{ duration: 5000 }
+						);
+						if (!statusInterval) {
+							startStatusPolling();
+						}
 					}
+				});
+				
+				// Handle real-time MIDI events
+				websocket.on('live_midi_event', (data) => {
+					handleLiveMidiEvent(data);
+				});
+				
+				// Handle rtpMIDI status updates
+				websocket.on('rtpmidi_status_update', (data) => {
+					handleRtpMidiStatus(data);
 				});
 			} else {
 				console.log('Socket.IO not available, using polling');
@@ -206,9 +274,26 @@
 	
 	function startStatusPolling() {
 		// Poll status every 500ms (reduced frequency when WebSocket is primary)
+		connectionStatus = 'polling';
 		statusInterval = setInterval(async () => {
 			await updateStatus();
 		}, 500);
+	}
+	
+	function startPerformanceMonitoring() {
+		// Monitor MIDI event rate every second
+		performanceMonitorInterval = setInterval(() => {
+			const now = Date.now();
+			const timeSinceLastEvent = now - lastMidiEventTime;
+			
+			// Calculate events per second over the last 5 seconds
+			if (timeSinceLastEvent < 5000) {
+				midiEventRate = midiEventCount / 5; // Approximate rate
+			} else {
+				midiEventRate = 0;
+				midiEventCount = 0; // Reset counter if no recent events
+			}
+		}, 1000);
 	}
 
 	function updatePlaybackState(data) {
@@ -472,6 +557,78 @@
 		}
 	}
 
+	// Real-time MIDI event handlers
+	function handleLiveMidiEvent(data) {
+		try {
+			// Performance monitoring
+			midiEventCount++;
+			const now = Date.now();
+			lastMidiEventTime = now;
+			
+			// Display real-time MIDI event feedback
+			const eventInfo = {
+				timestamp: data.timestamp || now,
+				note: data.note,
+				velocity: data.velocity,
+				channel: data.channel || 1,
+				event_type: data.event_type,
+				source: data.source || 'unknown'
+			};
+			
+			// Throttle status messages to prevent UI spam
+			if (midiEventCount % 10 === 0) {
+				if (data.event_type === 'note_on') {
+					statusManager.showMessage(
+						`🎹 Live MIDI: Note ${data.note} ON (vel: ${data.velocity}) - ${data.source} [Rate: ${midiEventRate.toFixed(1)}/s]`,
+						'info',
+						{ duration: 800, priority: 'low' }
+					);
+				} else if (data.event_type === 'note_off') {
+					statusManager.showMessage(
+						`🎹 Live MIDI: Note ${data.note} OFF - ${data.source} [Rate: ${midiEventRate.toFixed(1)}/s]`,
+						'info',
+						{ duration: 600, priority: 'low' }
+					);
+				}
+			}
+			
+			// Log for debugging (throttled)
+			if (midiEventCount % 50 === 0) {
+				console.log(`Live MIDI events processed: ${midiEventCount}, Rate: ${midiEventRate.toFixed(1)}/s`);
+			}
+			
+		} catch (error) {
+			console.error('Error handling live MIDI event:', error);
+		}
+	}
+	
+	function handleRtpMidiStatus(data) {
+		try {
+			// Handle rtpMIDI connection status updates
+			if (data.state === 'listening') {
+				statusManager.showMessage(
+					'🌐 rtpMIDI: Listening for network connections',
+					'success',
+					{ duration: 3000 }
+				);
+			} else if (data.state === 'error') {
+				statusManager.showMessage(
+					'🌐 rtpMIDI: Connection error',
+					'error',
+					{ duration: 5000 }
+				);
+			}
+			
+			// Log active sessions
+			if (data.active_sessions && Object.keys(data.active_sessions).length > 0) {
+				console.log('Active rtpMIDI sessions:', data.active_sessions);
+			}
+			
+		} catch (error) {
+			console.error('Error handling rtpMIDI status:', error);
+		}
+	}
+
 	// Timeline interaction functions
 	function handleTimelineClick(event: MouseEvent | TouchEvent) {
 		if (!timelineElement || totalDuration === 0) return;
@@ -592,6 +749,25 @@
 				<p>Loading...</p>
 			</div>
 		{:else}
+			<!-- Connection Status -->
+			<div class="connection-status">
+				<div class="status-row">
+					{#if connectionStatus === 'connected'}
+						<span class="status-indicator connected">🔗 Real-time</span>
+					{:else if connectionStatus === 'connecting'}
+						<span class="status-indicator connecting">🔄 Connecting...</span>
+					{:else if connectionStatus === 'polling'}
+						<span class="status-indicator polling">📡 Polling mode</span>
+					{:else}
+						<span class="status-indicator disconnected">❌ Disconnected</span>
+					{/if}
+					
+					{#if midiEventRate > 0}
+						<span class="performance-indicator">🎹 {midiEventRate.toFixed(1)}/s</span>
+					{/if}
+				</div>
+			</div>
+			
 			<!-- Song Information -->
 			<div class="song-info">
 				<h2>Now Playing</h2>
@@ -1479,6 +1655,80 @@
 	.nav-link:hover {
 		color: #1d4ed8;
 		text-decoration: underline;
+	}
+
+	/* Connection Status Styles */
+	.connection-status {
+		margin-bottom: 1rem;
+		display: flex;
+		justify-content: center;
+	}
+	
+	.status-row {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		flex-wrap: wrap;
+		justify-content: center;
+	}
+
+	.status-indicator {
+		padding: 0.5rem 1rem;
+		border-radius: 20px;
+		font-size: 0.875rem;
+		font-weight: 500;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		transition: all 0.3s ease;
+	}
+
+	.status-indicator.connected {
+		background-color: #dcfce7;
+		color: #166534;
+		border: 1px solid #bbf7d0;
+	}
+
+	.status-indicator.connecting {
+		background-color: #fef3c7;
+		color: #92400e;
+		border: 1px solid #fde68a;
+		animation: pulse 2s infinite;
+	}
+
+	.status-indicator.polling {
+		background-color: #dbeafe;
+		color: #1e40af;
+		border: 1px solid #bfdbfe;
+	}
+
+	.status-indicator.disconnected {
+		background-color: #fee2e2;
+		color: #dc2626;
+		border: 1px solid #fecaca;
+	}
+
+	.performance-indicator {
+		padding: 0.25rem 0.75rem;
+		border-radius: 15px;
+		font-size: 0.75rem;
+		font-weight: 600;
+		background-color: #f3f4f6;
+		color: #374151;
+		border: 1px solid #d1d5db;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		transition: all 0.3s ease;
+	}
+	
+	@keyframes pulse {
+		0%, 100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.7;
+		}
 	}
 
 	/* Mobile and Touch Device Optimizations */
