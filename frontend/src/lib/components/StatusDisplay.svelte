@@ -435,51 +435,49 @@
 		}
 	}
 
-	/* Dark mode support */
-	@media (prefers-color-scheme: dark) {
-		.progress-item,
-		.status-message {
-			background: #1f2937;
-			border-color: #374151;
-			color: #f9fafb;
-		}
+	/* Dark mode support - Use .dark class instead */
+	:global(.dark) .progress-item,
+	:global(.dark) .status-message {
+		background: #1f2937;
+		border-color: #374151;
+		color: #f9fafb;
+	}
 
-		.status-success {
-			background: linear-gradient(135deg, #064e3b 0%, #1f2937 100%);
-		}
+	:global(.dark) .status-success {
+		background: linear-gradient(135deg, #064e3b 0%, #1f2937 100%);
+	}
 
-		.status-error {
-			background: linear-gradient(135deg, #7f1d1d 0%, #1f2937 100%);
-		}
+	:global(.dark) .status-error {
+		background: linear-gradient(135deg, #7f1d1d 0%, #1f2937 100%);
+	}
 
-		.status-warning {
-			background: linear-gradient(135deg, #78350f 0%, #1f2937 100%);
-		}
+	:global(.dark) .status-warning {
+		background: linear-gradient(135deg, #78350f 0%, #1f2937 100%);
+	}
 
-		.status-info {
-			background: linear-gradient(135deg, #1e3a8a 0%, #1f2937 100%);
-		}
+	:global(.dark) .status-info {
+		background: linear-gradient(135deg, #1e3a8a 0%, #1f2937 100%);
+	}
 
-		.status-loading {
-			background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
-		}
+	:global(.dark) .status-loading {
+		background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+	}
 
-		.message-title {
-			color: #f9fafb;
-		}
+	:global(.dark) .message-title {
+		color: #f9fafb;
+	}
 
-		.message-content {
-			color: #d1d5db;
-		}
+	:global(.dark) .message-content {
+		color: #d1d5db;
+	}
 
-		.progress-bar {
-			background: #374151;
-		}
+	:global(.dark) .progress-bar {
+		background: #374151;
+	}
 
-		.progress-percentage,
-		.progress-text,
-		.progress-details {
-			color: #9ca3af;
-		}
+	:global(.dark) .progress-percentage,
+	:global(.dark) .progress-text,
+	:global(.dark) .progress-details {
+		color: #9ca3af;
 	}
 </style>

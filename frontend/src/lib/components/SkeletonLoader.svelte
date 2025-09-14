@@ -67,16 +67,14 @@
 	.rounded-md { border-radius: var(--radius-md); }
 	.rounded-full { border-radius: var(--radius-full); }
 
-	/* Dark Mode Support */
-	@media (prefers-color-scheme: dark) {
-		.skeleton {
-			background: linear-gradient(
-				90deg,
-				var(--color-gray-700) 25%,
-				var(--color-gray-600) 50%,
-				var(--color-gray-700) 75%
-			);
-		}
+	/* Dark Mode Support - Use .dark class instead */
+	:global(.dark) .skeleton {
+		background: linear-gradient(
+			90deg,
+			var(--color-gray-700) 25%,
+			var(--color-gray-600) 50%,
+			var(--color-gray-700) 75%
+		);
 	}
 
 	@media (prefers-reduced-motion: reduce) {
