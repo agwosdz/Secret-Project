@@ -142,6 +142,11 @@
 				// The LED updates will come through the led_update event
 			});
 			
+			websocket.on('unified_midi_event', (data) => {
+				console.log('Unified MIDI event:', data);
+				// Handle unified MIDI events from the manager
+			});
+			
 			websocket.on('disconnect', (reason) => {
 					console.log('Dashboard WebSocket disconnected:', reason);
 					connectionStatus = 'disconnected';

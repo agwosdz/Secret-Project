@@ -511,7 +511,19 @@ class USBMIDIInputService:
         """Broadcast MIDI event via WebSocket."""
         if self._websocket_callback:
             try:
+                # Send event to unified manager (which will broadcast unified_midi_event)
                 event_data = {
+                    'timestamp': event.timestamp,
+                    'note': event.note,
+                    'velocity': event.velocity,
+                    'channel': event.channel,
+                    'event_type': event.event_type,
+                    'source': f"USB:{self._current_device or 'unknown'}"
+                }
+                self._websocket_callback(event.event_type, event_data)
+                
+                # Also broadcast direct midi_input event for backward compatibility
+                legacy_event_data = {
                     'type': 'midi_input_event',
                     'timestamp': event.timestamp,
                     'note': event.note,
@@ -520,7 +532,7 @@ class USBMIDIInputService:
                     'event_type': event.event_type,
                     'active_notes': len(self._active_notes)
                 }
-                self._websocket_callback('midi_input', event_data)
+                self._websocket_callback('midi_input', legacy_event_data)
             except Exception as e:
                 self.logger.error(f"Error broadcasting MIDI event: {e}")
     
