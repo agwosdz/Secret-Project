@@ -2,5 +2,6 @@
     "led_count": 247,
     "max_led_count": 300,
     "brightness": 0.8,
-    "gpio_pin": 18
+    "gpio_pin": 18,
+    "size": "88-key"
 }

@@ -61,6 +61,24 @@
 
 	let validationErrors = {};
 
+	// Extract GPIO number from pin name (e.g., "GPIO19 (PWM)" -> 19)
+	function extractGpioNumber(pinName) {
+		const match = pinName.match(/GPIO(\d+)/);
+		return match ? parseInt(match[1]) : null;
+	}
+
+	// Get GPIO number for a board pin
+	function getBoardPinGpio(boardPin) {
+		const pin = gpioPinout.find(p => p.pin === boardPin);
+		return pin ? extractGpioNumber(pin.name) : null;
+	}
+
+	// Find board pin by GPIO number
+	function findBoardPinByGpio(gpioNumber) {
+		const pin = gpioPinout.find(p => extractGpioNumber(p.name) === gpioNumber);
+		return pin ? pin.pin : null;
+	}
+
 	function validatePin(pinNumber, pinType) {
 		const pin = gpioPinout.find(p => p.pin === pinNumber);
 		
@@ -72,9 +90,14 @@
 			return `Pin ${pinNumber} is reserved (${pin.name})`;
 		}
 		
-		// Check for conflicts with other assigned pins
-		const usedPins = [config.gpio_pin, config.gpio_power_pin, config.gpio_ground_pin].filter(p => p !== null && p !== pinNumber);
-		if (usedPins.includes(pinNumber)) {
+		// Check for conflicts with other assigned pins (convert GPIO numbers to board pins for comparison)
+		const currentBoardPins = [
+			findBoardPinByGpio(config.gpio_pin),
+			findBoardPinByGpio(config.gpio_power_pin), 
+			findBoardPinByGpio(config.gpio_ground_pin)
+		].filter(p => p !== null && p !== pinNumber);
+		
+		if (currentBoardPins.includes(pinNumber)) {
 			return 'Pin already in use';
 		}
 		
@@ -82,25 +105,39 @@
 	}
 
 	function handleConfigChange(key, value) {
-		config = { ...config, [key]: value };
-		
-		// Validate the changed pin
+		// Convert board pin number to GPIO number for pin-related configs
 		if (key.includes('pin') && value !== null) {
+			const gpioNumber = getBoardPinGpio(value);
+			if (gpioNumber !== null) {
+				config = { ...config, [key]: gpioNumber };
+			} else {
+				config = { ...config, [key]: value };
+			}
+			
+			// Validate using board pin number
 			const error = validatePin(value, key);
 			validationErrors = { ...validationErrors, [key]: error };
 		} else if (key.includes('pin')) {
 			// Clear error if pin is set to null
+			config = { ...config, [key]: null };
 			const { [key]: removed, ...rest } = validationErrors;
 			validationErrors = rest;
+		} else {
+			config = { ...config, [key]: value };
 		}
 		
 		dispatch('change', config);
 	}
 
 	function getPinStatus(pinNumber) {
-		if (pinNumber === config.gpio_pin) return 'data';
-		if (pinNumber === config.gpio_power_pin) return 'power';
-		if (pinNumber === config.gpio_ground_pin) return 'ground';
+		// Convert GPIO numbers to board pins for comparison
+		const dataBoardPin = findBoardPinByGpio(config.gpio_pin);
+		const powerBoardPin = findBoardPinByGpio(config.gpio_power_pin);
+		const groundBoardPin = findBoardPinByGpio(config.gpio_ground_pin);
+		
+		if (pinNumber === dataBoardPin) return 'data';
+		if (pinNumber === powerBoardPin) return 'power';
+		if (pinNumber === groundBoardPin) return 'ground';
 		return null;
 	}
 
@@ -112,6 +149,11 @@
 	}
 
 	$: hasErrors = Object.values(validationErrors).some(error => error !== null);
+	
+	// Computed values for select bindings (convert GPIO numbers to board pins for display)
+	$: selectedDataPin = findBoardPinByGpio(config.gpio_pin) || config.gpio_pin;
+	$: selectedPowerPin = config.gpio_power_pin ? findBoardPinByGpio(config.gpio_power_pin) : null;
+	$: selectedGroundPin = config.gpio_ground_pin ? findBoardPinByGpio(config.gpio_ground_pin) : null;
 </script>
 
 <div class="gpio-config-panel">
@@ -123,7 +165,7 @@
 				<label for="gpio-data-pin">Data Pin (Required)</label>
 				<select
 					id="gpio-data-pin"
-					bind:value={config.gpio_pin}
+					bind:value={selectedDataPin}
 					on:change={(e) => handleConfigChange('gpio_pin', parseInt(e.target.value))}
 					{disabled}
 					class:error={validationErrors.gpio_pin}
@@ -141,12 +183,12 @@
 				<label for="gpio-power-pin">Power Control Pin (Optional)</label>
 				<select
 					id="gpio-power-pin"
-					bind:value={config.gpio_power_pin}
-					on:change={(e) => handleConfigChange('gpio_power_pin', e.target.value === 'null' ? null : parseInt(e.target.value))}
+					bind:value={selectedPowerPin}
+					on:change={(e) => handleConfigChange('gpio_power_pin', e.target.value === '' ? null : parseInt(e.target.value))}
 					{disabled}
 					class:error={validationErrors.gpio_power_pin}
 				>
-					<option value="null">None</option>
+					<option value={null}>None</option>
 					{#each gpioPinout.filter(p => p.available) as pin}
 						<option value={pin.pin}>Pin {pin.pin} - {pin.name}</option>
 					{/each}
@@ -160,12 +202,12 @@
 				<label for="gpio-ground-pin">Ground Reference Pin (Optional)</label>
 				<select
 					id="gpio-ground-pin"
-					bind:value={config.gpio_ground_pin}
-					on:change={(e) => handleConfigChange('gpio_ground_pin', e.target.value === 'null' ? null : parseInt(e.target.value))}
+					bind:value={selectedGroundPin}
+					on:change={(e) => handleConfigChange('gpio_ground_pin', e.target.value === '' ? null : parseInt(e.target.value))}
 					{disabled}
 					class:error={validationErrors.gpio_ground_pin}
 				>
-					<option value="null">None</option>
+					<option value={null}>None</option>
 					{#each gpioPinout.filter(p => p.available) as pin}
 						<option value={pin.pin}>Pin {pin.pin} - {pin.name}</option>
 					{/each}
