@@ -14,11 +14,14 @@ except ImportError as e:
     GPIO = None
 
 try:
-    from config import get_config
+    from backend.config import get_config
 except ImportError:
-    logging.warning("Config module not available, using defaults")
-    def get_config(key, default):
-        return default
+    try:
+        from config import get_config
+    except ImportError:
+        logging.warning("Config module not available, using defaults")
+        def get_config(key, default):
+            return default
 
 class LEDController:
     """Controller for WS2812B LED strip using rpi_ws281x library."""
