@@ -1068,7 +1068,7 @@ def get_settings():
 @app.route('/api/settings', methods=['POST'])
 def update_settings():
     """Update settings with validation"""
-    global led_controller
+    global led_controller, playback_service, midi_input_manager
     try:
         data = request.get_json()
         if not data:
@@ -1107,7 +1107,6 @@ def update_settings():
         hardware_fields = ['gpio_pin', 'led_count', 'led_frequency', 'led_dma', 'led_channel', 'led_invert', 'brightness', 'led_orientation']
         if any(field in data for field in hardware_fields) and led_controller:
             try:
-                global led_controller, playback_service, midi_input_manager
                 # Clean up existing controller
                 if hasattr(led_controller, 'cleanup'):
                     led_controller.cleanup()
