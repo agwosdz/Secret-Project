@@ -3,5 +3,6 @@
     "max_led_count": 300,
     "brightness": 0.8,
     "gpio_pin": 18,
-    "size": "88-key"
+    "size": "88-key",
+    "led_orientation": "normal"
 }

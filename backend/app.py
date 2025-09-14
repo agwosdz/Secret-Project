@@ -1104,7 +1104,7 @@ def update_settings():
         save_config(updated_config)
         
         # Reinitialize LED controller if hardware settings changed
-        hardware_fields = ['gpio_pin', 'led_count', 'led_frequency', 'led_dma', 'led_channel', 'led_invert', 'brightness']
+        hardware_fields = ['gpio_pin', 'led_count', 'led_frequency', 'led_dma', 'led_channel', 'led_invert', 'brightness', 'led_orientation']
         if any(field in data for field in hardware_fields) and led_controller:
             try:
                 led_controller = LEDController(
