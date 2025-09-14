@@ -142,7 +142,8 @@ else:
 if MIDIInputManager:
     try:
         midi_input_manager = MIDIInputManager(
-            websocket_callback=lambda event_type, data: socketio.emit(event_type, data)
+            websocket_callback=lambda event_type, data: socketio.emit(event_type, data),
+            led_controller=led_controller
         )
         # Initialize the services within the manager
         if midi_input_manager.initialize_services():

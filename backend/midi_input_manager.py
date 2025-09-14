@@ -54,15 +54,17 @@ class UnifiedMIDIEvent:
 class MIDIInputManager:
     """Unified manager for coordinating USB and rtpMIDI inputs"""
     
-    def __init__(self, websocket_callback: Optional[Callable] = None):
+    def __init__(self, websocket_callback: Optional[Callable] = None, led_controller: Optional['LEDController'] = None):
         """
         Initialize unified MIDI input manager.
         
         Args:
             websocket_callback: Callback function for WebSocket event broadcasting
+            led_controller: LED controller instance for real-time visualization
         """
         self.logger = logging.getLogger(__name__)
         self._websocket_callback = websocket_callback
+        self._led_controller = led_controller
         
         # Load configuration
         self.enable_usb = get_config('midi_enable_usb', True)
@@ -130,6 +132,7 @@ class MIDIInputManager:
         if self.enable_usb and USBMIDIInputService:
             try:
                 self._usb_service = USBMIDIInputService(
+                    led_controller=self._led_controller,
                     websocket_callback=self._handle_usb_event
                 )
                 self._source_status[MIDIInputSource.USB]['available'] = True
