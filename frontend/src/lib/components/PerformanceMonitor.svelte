@@ -266,14 +266,7 @@
 		font-family: 'Courier New', monospace;
 	}
 
-	.performance-monitor h3 {
-		margin: 0 0 1rem 0;
-		font-size: 1.1rem;
-		font-weight: 600;
-		color: #333;
-		border-bottom: 2px solid #28a745;
-		padding-bottom: 0.5rem;
-	}
+
 
 	.metrics-grid {
 		display: grid;
@@ -571,10 +564,7 @@
 			padding: 0.5rem;
 		}
 		
-		.performance-monitor h3 {
-			font-size: 1rem;
-			margin-bottom: 0.75rem;
-		}
+
 		
 		.metrics-grid {
 			grid-template-columns: 1fr;

@@ -236,38 +236,41 @@
 		</div>
 
 		<div class="control-group">
-			<label>RGB Values:</label>
-			<div class="rgb-controls">
-				<div class="rgb-input">
-					<label>R:</label>
-					<input 
-						type="range" 
-						bind:value={selectedColor.r} 
-						min="0" 
-						max="255"
-						disabled={!isConnected}
-					/>
-					<span>{selectedColor.r}</span>
-				</div>
-				<div class="rgb-input">
-					<label>G:</label>
-					<input 
-						type="range" 
-						bind:value={selectedColor.g} 
-						min="0" 
-						max="255"
-						disabled={!isConnected}
-					/>
-					<span>{selectedColor.g}</span>
-				</div>
-				<div class="rgb-input">
-					<label>B:</label>
-					<input 
-						type="range" 
-						bind:value={selectedColor.b} 
-						min="0" 
-						max="255"
-						disabled={!isConnected}
+				<span class="group-label">RGB Values:</span>
+				<div class="rgb-controls">
+					<div class="rgb-input">
+						<label for="rgb-r">R:</label>
+						<input 
+							id="rgb-r"
+							type="range" 
+							bind:value={selectedColor.r} 
+							min="0" 
+							max="255"
+							disabled={!isConnected}
+						/>
+						<span>{selectedColor.r}</span>
+					</div>
+					<div class="rgb-input">
+						<label for="rgb-g">G:</label>
+						<input 
+							id="rgb-g"
+							type="range" 
+							bind:value={selectedColor.g} 
+							min="0" 
+							max="255"
+							disabled={!isConnected}
+						/>
+						<span>{selectedColor.g}</span>
+					</div>
+					<div class="rgb-input">
+						<label for="rgb-b">B:</label>
+						<input 
+							id="rgb-b"
+							type="range" 
+							bind:value={selectedColor.b} 
+							min="0" 
+							max="255"
+							disabled={!isConnected}
 					/>
 					<span>{selectedColor.b}</span>
 				</div>

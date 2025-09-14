@@ -650,7 +650,7 @@
 			<h2>🎹 MIDI Device Management</h2>
 			<div class="midi-panels">
 				<div class="midi-panel">
-					<div class="panel-header" on:click={() => midiDevicesExpanded = !midiDevicesExpanded}>
+					<div class="panel-header" role="button" tabindex="0" on:click={() => midiDevicesExpanded = !midiDevicesExpanded} on:keydown={(e) => e.key === 'Enter' || e.key === ' ' ? midiDevicesExpanded = !midiDevicesExpanded : null}>
 						<h3>Device Selection</h3>
 						<span class="expand-icon {midiDevicesExpanded ? 'expanded' : ''}">
 							{midiDevicesExpanded ? '▼' : '▶'}
@@ -668,7 +668,7 @@
 				</div>
 
 				<div class="midi-panel">
-					<div class="panel-header" on:click={() => networkMidiExpanded = !networkMidiExpanded}>
+					<div class="panel-header" role="button" tabindex="0" on:click={() => networkMidiExpanded = !networkMidiExpanded} on:keydown={(e) => e.key === 'Enter' || e.key === ' ' ? networkMidiExpanded = !networkMidiExpanded : null}>
 						<h3>Network MIDI</h3>
 						<span class="expand-icon {networkMidiExpanded ? 'expanded' : ''}">
 							{networkMidiExpanded ? '▼' : '▶'}

@@ -324,7 +324,7 @@
 
 	<!-- Auto-Discovery Section -->
 	<div class="auto-discovery-section">
-		<div class="section-header" on:click={() => showAutoDiscovery = !showAutoDiscovery}>
+		<div class="section-header" role="button" tabindex="0" on:click={() => showAutoDiscovery = !showAutoDiscovery} on:keydown={(e) => e.key === 'Enter' || e.key === ' ' ? showAutoDiscovery = !showAutoDiscovery : null}>
 			<h4>🔍 Auto-Discovery</h4>
 			<span class="expand-icon {showAutoDiscovery ? 'expanded' : ''}">
 				{showAutoDiscovery ? '▼' : '▶'}
