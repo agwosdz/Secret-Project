@@ -1379,7 +1379,15 @@ def connect_rtpmidi_session():
                 'message': 'session_name and host are required'
             }), 400
         
-        success = midi_input_manager._rtpmidi_service.connect_session(session_name, host, port)
+        # Create RtpMIDISession object for connection
+        from rtpmidi_service import RtpMIDISession
+        session = RtpMIDISession(
+            name=session_name,
+            ip_address=host,
+            port=port
+        )
+        
+        success = midi_input_manager._rtpmidi_service.connect_session(session)
         
         if success:
             return jsonify({
