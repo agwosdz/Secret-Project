@@ -1300,6 +1300,64 @@ def get_rtpmidi_sessions():
             'message': 'An unexpected error occurred while getting rtpMIDI sessions'
         }), 500
 
+@app.route('/api/rtpmidi/discover', methods=['POST'])
+def start_rtpmidi_discovery():
+    """Start rtpMIDI session discovery"""
+    try:
+        if not midi_input_manager or not midi_input_manager._rtpmidi_service:
+            return jsonify({
+                'error': 'Service Unavailable',
+                'message': 'rtpMIDI service not available'
+            }), 503
+        
+        success = midi_input_manager._rtpmidi_service.start_discovery()
+        if success:
+            return jsonify({
+                'status': 'success',
+                'message': 'rtpMIDI discovery started'
+            }), 200
+        else:
+            return jsonify({
+                'error': 'Discovery Failed',
+                'message': 'Failed to start rtpMIDI discovery'
+            }), 500
+        
+    except Exception as e:
+        logger.error(f"Error starting rtpMIDI discovery: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred while starting rtpMIDI discovery'
+        }), 500
+
+@app.route('/api/rtpmidi/discovery-status', methods=['GET'])
+def get_rtpmidi_discovery_status():
+    """Get rtpMIDI discovery status and progress"""
+    try:
+        if not midi_input_manager or not midi_input_manager._rtpmidi_service:
+            return jsonify({
+                'error': 'Service Unavailable',
+                'message': 'rtpMIDI service not available'
+            }), 503
+        
+        rtpmidi_service = midi_input_manager._rtpmidi_service
+        is_discovering = rtpmidi_service.is_discovering
+        sessions = rtpmidi_service.get_available_sessions()
+        
+        return jsonify({
+            'status': 'success',
+            'discovering': is_discovering,
+            'completed': not is_discovering,
+            'progress': 100 if not is_discovering else 50,  # Simple progress indication
+            'devices': sessions
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting rtpMIDI discovery status: {e}")
+        return jsonify({
+            'error': 'Internal Server Error',
+            'message': 'An unexpected error occurred while getting rtpMIDI discovery status'
+        }), 500
+
 @app.route('/api/rtpmidi/connect', methods=['POST'])
 def connect_rtpmidi_session():
     """Connect to an rtpMIDI session"""

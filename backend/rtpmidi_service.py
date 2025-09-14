@@ -162,6 +162,11 @@ class RtpMIDIService:
         """Check if service is actively listening for rtpMIDI connections"""
         return self._state == RtpMIDIState.LISTENING
     
+    @property
+    def is_discovering(self) -> bool:
+        """Check if service is actively discovering rtpMIDI sessions"""
+        return self._state == RtpMIDIState.DISCOVERING
+    
     def start_discovery(self) -> bool:
         """
         Start rtpMIDI session discovery using Bonjour/mDNS.
