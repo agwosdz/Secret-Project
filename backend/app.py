@@ -1107,12 +1107,46 @@ def update_settings():
         hardware_fields = ['gpio_pin', 'led_count', 'led_frequency', 'led_dma', 'led_channel', 'led_invert', 'brightness', 'led_orientation']
         if any(field in data for field in hardware_fields) and led_controller:
             try:
+                global led_controller
+                # Clean up existing controller
+                if hasattr(led_controller, 'cleanup'):
+                    led_controller.cleanup()
+                
+                # Create new controller with updated configuration
                 led_controller = LEDController(
                     pin=updated_config.get('gpio_pin', 18),
                     num_pixels=updated_config.get('led_count', 246),
                     brightness=updated_config.get('brightness', 0.5)
                 )
                 logger.info("LED controller reinitialized with new settings")
+                
+                # Reinitialize playback service with new LED controller and configuration
+                global playback_service
+                if playback_service:
+                    # Stop current playback and clean up
+                    playback_service.stop_playback()
+                    
+                    # Create new playback service with updated configuration
+                    playback_service = PlaybackService(led_controller=led_controller, midi_parser=midi_parser)
+                    playback_service.add_status_callback(websocket_status_callback)
+                    logger.info("Playback service reinitialized with new LED controller and configuration")
+                    
+                # Update MIDI input manager with new LED controller
+                global midi_input_manager
+                if midi_input_manager and hasattr(midi_input_manager, '_led_controller'):
+                    midi_input_manager._led_controller = led_controller
+                    # Reinitialize USB MIDI service if it exists
+                    if hasattr(midi_input_manager, 'usb_midi_service') and midi_input_manager.usb_midi_service:
+                        midi_input_manager.usb_midi_service._led_controller = led_controller
+                        # Update configuration-dependent properties
+                        piano_size = updated_config.get('piano_size', '88-key')
+                        piano_specs = get_piano_specs(piano_size)
+                        midi_input_manager.usb_midi_service.num_leds = piano_specs['keys']
+                        midi_input_manager.usb_midi_service.min_midi_note = piano_specs['midi_start']
+                        midi_input_manager.usb_midi_service.max_midi_note = piano_specs['midi_end']
+                        midi_input_manager.usb_midi_service.led_orientation = updated_config.get('led_orientation', 'normal')
+                        logger.info("MIDI input manager updated with new LED controller and configuration")
+                    
             except Exception as e:
                 logger.error(f"Failed to reinitialize LED controller: {e}")
                 return jsonify({
