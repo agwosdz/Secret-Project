@@ -69,7 +69,7 @@ app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__fil
 
 # Import configuration module
 try:
-    from config import load_config, update_config, get_config, validate_config, get_piano_specs
+    from config import load_config, update_config, get_config, validate_config, get_piano_specs, save_config
     # Load LED count from configuration
     LED_COUNT = get_config('led_count', int(os.environ.get('LED_COUNT', 246)))
     logger.info(f"Loaded LED count from configuration: {LED_COUNT}")
@@ -1068,6 +1068,7 @@ def get_settings():
 @app.route('/api/settings', methods=['POST'])
 def update_settings():
     """Update settings with validation"""
+    global led_controller
     try:
         data = request.get_json()
         if not data:
@@ -1091,29 +1092,25 @@ def update_settings():
                 updated_config['led_count'] = specs.get('keys', 88)
         
         # Validate configuration
-        validation_result = validate_config(updated_config)
-        if not validation_result.get('valid', False):
+        validation_errors = validate_config(updated_config)
+        if validation_errors:
             return jsonify({
                 'error': 'Validation Error',
-                'message': validation_result.get('error', 'Invalid configuration'),
-                'details': validation_result
+                'message': 'Configuration validation failed',
+                'details': validation_errors
             }), 400
         
         # Save configuration
-        update_config(updated_config)
+        save_config(updated_config)
         
         # Reinitialize LED controller if hardware settings changed
         hardware_fields = ['gpio_pin', 'led_count', 'led_frequency', 'led_dma', 'led_channel', 'led_invert', 'brightness']
         if any(field in data for field in hardware_fields) and led_controller:
             try:
                 led_controller = LEDController(
-                    led_count=updated_config.get('led_count', 246),
-                    gpio_pin=updated_config.get('gpio_pin', 18),
-                    freq_hz=updated_config.get('led_frequency', 800000),
-                    dma=updated_config.get('led_dma', 10),
-                    channel=updated_config.get('led_channel', 0),
-                    invert=updated_config.get('led_invert', False),
-                    brightness=int(updated_config.get('brightness', 0.5) * 255)
+                    pin=updated_config.get('gpio_pin', 18),
+                    num_pixels=updated_config.get('led_count', 246),
+                    brightness=updated_config.get('brightness', 0.5)
                 )
                 logger.info("LED controller reinitialized with new settings")
             except Exception as e:
