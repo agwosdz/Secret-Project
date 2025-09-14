@@ -10,6 +10,7 @@ from flask_socketio import SocketIO, emit
 import os
 import logging
 import time
+import math
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge, BadRequest
 import mimetypes
@@ -1056,16 +1057,7 @@ def get_settings():
     """Get all current settings"""
     try:
         config = load_config()
-        return jsonify({
-            'status': 'success',
-            'settings': {
-                'piano_size': config.get('piano_size', '88-key'),
-                'gpio_pin': config.get('gpio_pin', 19),
-                'led_orientation': config.get('led_orientation', 'normal'),
-                'led_count': config.get('led_count', 246),
-                'brightness': config.get('brightness', 0.5)
-            }
-        }), 200
+        return jsonify(config), 200
     except Exception as e:
         logger.error(f"Error getting settings: {e}")
         return jsonify({
@@ -1089,75 +1081,454 @@ def update_settings():
         
         # Update only provided fields
         updated_config = current_config.copy()
+        updated_config.update(data)
         
         # Handle piano size changes
-        if 'piano_size' in data:
+        if 'piano_size' in data and data['piano_size'] != 'custom':
             piano_size = data['piano_size']
-            updated_config['piano_size'] = piano_size
-            
-            # Auto-update LED count based on piano size
             specs = get_piano_specs(piano_size)
-            updated_config['led_count'] = specs['num_keys']
-        
-        # Update other fields
-        for field in ['gpio_pin', 'led_orientation', 'brightness']:
-            if field in data:
-                updated_config[field] = data[field]
-        
-        # Handle custom LED count
-        if 'led_count' in data and updated_config.get('piano_size') == 'custom':
-            updated_config['led_count'] = data['led_count']
+            if 'led_count' not in data:  # Only auto-update if not explicitly set
+                updated_config['led_count'] = specs.get('keys', 88)
         
         # Validate configuration
-        validation_errors = validate_config(updated_config)
-        if validation_errors:
+        validation_result = validate_config(updated_config)
+        if not validation_result.get('valid', False):
             return jsonify({
                 'error': 'Validation Error',
-                'message': 'Invalid configuration values',
-                'details': validation_errors
+                'message': validation_result.get('error', 'Invalid configuration'),
+                'details': validation_result
             }), 400
         
         # Save configuration
-        logger.info(f"Attempting to save config: {updated_config}")
-        try:
-            from config import save_config
-            save_result = save_config(updated_config)
-            logger.info(f"Save config result: {save_result}")
-            if not save_result:
-                logger.error("save_config returned False")
+        update_config(updated_config)
+        
+        # Reinitialize LED controller if hardware settings changed
+        hardware_fields = ['gpio_pin', 'led_count', 'led_frequency', 'led_dma', 'led_channel', 'led_invert', 'brightness']
+        if any(field in data for field in hardware_fields) and led_controller:
+            try:
+                led_controller = LEDController(
+                    led_count=updated_config.get('led_count', 246),
+                    gpio_pin=updated_config.get('gpio_pin', 18),
+                    freq_hz=updated_config.get('led_frequency', 800000),
+                    dma=updated_config.get('led_dma', 10),
+                    channel=updated_config.get('led_channel', 0),
+                    invert=updated_config.get('led_invert', False),
+                    brightness=int(updated_config.get('brightness', 0.5) * 255)
+                )
+                logger.info("LED controller reinitialized with new settings")
+            except Exception as e:
+                logger.error(f"Failed to reinitialize LED controller: {e}")
                 return jsonify({
-                    'error': 'Internal Server Error',
-                    'message': 'Failed to save configuration'
+                    'error': 'Hardware Error',
+                    'message': f'Settings saved but LED controller failed to reinitialize: {str(e)}'
                 }), 500
-        except Exception as save_error:
-            logger.error(f"Exception during save_config: {save_error}")
-            return jsonify({
-                'error': 'Internal Server Error',
-                'message': f'Failed to save configuration: {str(save_error)}'
-            }), 500
         
-        # Update global LED_COUNT if changed
-        global LED_COUNT
-        if 'led_count' in updated_config:
-            LED_COUNT = updated_config['led_count']
-        
-        return jsonify({
-            'status': 'success',
-            'message': 'Settings updated successfully',
-            'settings': {
-                'piano_size': updated_config.get('piano_size'),
-                'gpio_pin': updated_config.get('gpio_pin'),
-                'led_orientation': updated_config.get('led_orientation'),
-                'led_count': updated_config.get('led_count'),
-                'brightness': updated_config.get('brightness')
-            }
-        }), 200
+        return jsonify({'message': 'Settings updated successfully'}), 200
         
     except Exception as e:
         logger.error(f"Error updating settings: {e}")
         return jsonify({
             'error': 'Internal Server Error',
             'message': 'An unexpected error occurred while updating settings'
+        }), 500
+
+
+@app.route('/api/test-hardware', methods=['POST'])
+def test_hardware():
+    """Test hardware configuration"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': 'No configuration data provided'
+            }), 400
+        
+        # Validate GPIO pin availability
+        gpio_pin = data.get('gpio_pin', 18)
+        try:
+            from config import validate_gpio_pin_availability
+            if not validate_gpio_pin_availability(gpio_pin):
+                return jsonify({
+                    'success': False,
+                    'message': f'GPIO pin {gpio_pin} is not available or already in use'
+                }), 200
+        except Exception as e:
+            logger.warning(f"GPIO validation failed: {e}")
+        
+        # Test LED controller initialization
+        if LEDController:
+            try:
+                test_controller = LEDController(
+                    led_count=data.get('led_count', 246),
+                    gpio_pin=gpio_pin,
+                    freq_hz=data.get('led_frequency', 800000),
+                    dma=data.get('led_dma', 10),
+                    channel=data.get('led_channel', 0),
+                    invert=data.get('led_invert', False),
+                    brightness=int(data.get('brightness', 0.5) * 255)
+                )
+                
+                # Test basic LED functionality
+                test_controller.clear()
+                test_controller.set_pixel(0, (255, 0, 0))  # Red test
+                test_controller.show()
+                time.sleep(0.1)
+                test_controller.clear()
+                test_controller.show()
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'Hardware test passed successfully'
+                }), 200
+                
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'message': f'LED controller test failed: {str(e)}'
+                }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'LED controller not available (development mode?)'
+            }), 200
+            
+    except Exception as e:
+        logger.error(f"Error testing hardware: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Hardware test error: {str(e)}'
+        }), 500
+
+@app.route('/api/led-test-sequence', methods=['POST'])
+def start_led_test_sequence():
+    """Start an LED test sequence"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': 'No test sequence data provided'
+            }), 400
+            
+        sequence_type = data.get('type', 'rainbow')
+        duration = data.get('duration', 5)  # seconds
+        led_count = data.get('led_count', LED_COUNT)
+        
+        if not led_controller:
+            return jsonify({
+                'success': False,
+                'message': 'LED controller not available'
+            }), 503
+            
+        # Emit test sequence start event
+        socketio.emit('led_test_sequence_start', {
+            'type': sequence_type,
+            'duration': duration,
+            'led_count': led_count
+        })
+        
+        # Start the test sequence in a background thread
+        socketio.start_background_task(_run_led_test_sequence, sequence_type, duration, led_count)
+        
+        return jsonify({
+            'success': True,
+            'message': f'LED test sequence "{sequence_type}" started',
+            'duration': duration
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error starting LED test sequence: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Test sequence error: {str(e)}'
+        }), 500
+
+@app.route('/api/led-test-sequence/stop', methods=['POST'])
+def stop_led_test_sequence():
+    """Stop the current LED test sequence"""
+    try:
+        if led_controller:
+            led_controller.clear()
+            led_controller.show()
+            
+        # Emit test sequence stop event
+        socketio.emit('led_test_sequence_stop', {})
+        
+        return jsonify({
+            'success': True,
+            'message': 'LED test sequence stopped'
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error stopping LED test sequence: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Stop sequence error: {str(e)}'
+        }), 500
+
+def _run_led_test_sequence(sequence_type, duration, led_count):
+    """Run LED test sequence in background thread"""
+    try:
+        if not led_controller:
+            return
+            
+        start_time = time.time()
+        
+        while time.time() - start_time < duration:
+            if sequence_type == 'rainbow':
+                _rainbow_sequence(led_count)
+            elif sequence_type == 'chase':
+                _chase_sequence(led_count)
+            elif sequence_type == 'fade':
+                _fade_sequence(led_count)
+            elif sequence_type == 'piano_keys':
+                _piano_keys_sequence(led_count)
+            else:
+                _rainbow_sequence(led_count)  # Default
+                
+            time.sleep(0.05)  # 20 FPS
+            
+        # Clear LEDs when done
+        led_controller.clear()
+        led_controller.show()
+        
+        # Emit completion event
+        socketio.emit('led_test_sequence_complete', {
+            'type': sequence_type,
+            'duration': duration
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in LED test sequence: {e}")
+        socketio.emit('led_test_sequence_error', {
+            'error': str(e)
+        })
+
+def _rainbow_sequence(led_count):
+    """Rainbow color sequence"""
+    hue_offset = (time.time() * 50) % 360
+    for i in range(min(led_count, 246)):
+        hue = (hue_offset + (i * 360 / led_count)) % 360
+        r, g, b = _hue_to_rgb(hue)
+        led_controller.set_pixel(i, (int(r * 255), int(g * 255), int(b * 255)))
+    led_controller.show()
+
+def _chase_sequence(led_count):
+    """Chase light sequence"""
+    position = int((time.time() * 10) % led_count)
+    led_controller.clear()
+    for i in range(5):  # 5-LED chase
+        led_pos = (position + i) % led_count
+        brightness = 1.0 - (i * 0.2)
+        led_controller.set_pixel(led_pos, (int(255 * brightness), int(100 * brightness), 0))
+    led_controller.show()
+
+def _fade_sequence(led_count):
+    """Fade in/out sequence"""
+    brightness = (math.sin(time.time() * 2) + 1) / 2  # 0 to 1
+    color = (int(255 * brightness), int(100 * brightness), int(50 * brightness))
+    for i in range(min(led_count, 246)):
+        led_controller.set_pixel(i, color)
+    led_controller.show()
+
+def _piano_keys_sequence(led_count):
+    """Piano key pattern sequence"""
+    # Simulate piano key pattern with white and black key colors
+    pattern_offset = int((time.time() * 5) % 12)
+    white_key_pattern = [0, 2, 4, 5, 7, 9, 11]  # C major scale
+    
+    for i in range(min(led_count, 246)):
+        key_pos = (i + pattern_offset) % 12
+        if key_pos in white_key_pattern:
+            led_controller.set_pixel(i, (255, 255, 255))  # White
+        else:
+            led_controller.set_pixel(i, (50, 50, 50))     # Dark gray for black keys
+    led_controller.show()
+
+def _hue_to_rgb(hue):
+    """Convert HSV hue to RGB (saturation=1, value=1)"""
+    hue = hue % 360
+    c = 1.0  # chroma
+    x = c * (1 - abs((hue / 60) % 2 - 1))
+    m = 0
+    
+    if 0 <= hue < 60:
+        r, g, b = c, x, 0
+    elif 60 <= hue < 120:
+        r, g, b = x, c, 0
+    elif 120 <= hue < 180:
+        r, g, b = 0, c, x
+    elif 180 <= hue < 240:
+        r, g, b = 0, x, c
+    elif 240 <= hue < 300:
+        r, g, b = x, 0, c
+    else:
+        r, g, b = c, 0, x
+    
+    return r + m, g + m, b + m
+
+@app.route('/api/config/validate', methods=['POST'])
+def validate_configuration():
+    """Validate configuration with comprehensive checks"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': 'No configuration data provided'
+            }), 400
+        
+        from config import validate_config_comprehensive
+        validation_result = validate_config_comprehensive(data)
+        
+        return jsonify({
+            'success': True,
+            'validation': validation_result
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error validating configuration: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Validation error: {str(e)}'
+        }), 500
+
+@app.route('/api/config/backup', methods=['POST'])
+def backup_configuration():
+    """Create a backup of current configuration"""
+    try:
+        from config import backup_config
+        success = backup_config()
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Configuration backed up successfully'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to backup configuration'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error backing up configuration: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Backup error: {str(e)}'
+        }), 500
+
+@app.route('/api/config/restore', methods=['POST'])
+def restore_configuration():
+    """Restore configuration from backup"""
+    try:
+        from config import restore_config_from_backup
+        success = restore_config_from_backup()
+        
+        if success:
+            # Reload configuration
+            global config
+            config = load_config()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Configuration restored successfully'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to restore configuration (no backup found)'
+            }), 404
+            
+    except Exception as e:
+        logger.error(f"Error restoring configuration: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Restore error: {str(e)}'
+        }), 500
+
+@app.route('/api/config/reset', methods=['POST'])
+def reset_configuration():
+    """Reset configuration to defaults"""
+    try:
+        from config import reset_config_to_defaults
+        success = reset_config_to_defaults()
+        
+        if success:
+            # Reload configuration
+            global config
+            config = load_config()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Configuration reset to defaults'
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to reset configuration'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error resetting configuration: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Reset error: {str(e)}'
+        }), 500
+
+@app.route('/api/config/export', methods=['POST'])
+def export_configuration():
+    """Export configuration to file"""
+    try:
+        data = request.get_json()
+        export_path = data.get('path') if data else None
+        
+        if not export_path:
+            # Generate default export path
+            import datetime
+            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+            export_path = f"config_export_{timestamp}.json"
+        
+        from config import export_config
+        success = export_config(export_path)
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': f'Configuration exported to {export_path}',
+                'export_path': export_path
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to export configuration'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error exporting configuration: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Export error: {str(e)}'
+        }), 500
+
+@app.route('/api/config/history', methods=['GET'])
+def get_configuration_history():
+    """Get configuration change history"""
+    try:
+        from config import get_config_history
+        history = get_config_history()
+        
+        return jsonify({
+            'success': True,
+            'history': history
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting configuration history: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'History error: {str(e)}'
         }), 500
 
 # Unified MIDI Input API Endpoints (USB + rtpMIDI)

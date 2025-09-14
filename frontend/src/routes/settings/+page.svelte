@@ -1,16 +1,64 @@
 <script>
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import PianoKeyboardSelector from '$lib/components/PianoKeyboardSelector.svelte';
+	import GPIOConfigPanel from '$lib/components/GPIOConfigPanel.svelte';
+	import LEDStripConfig from '$lib/components/LEDStripConfig.svelte';
+	import LEDTestSequence from '$lib/components/LEDTestSequence.svelte';
+import ConfigurationManager from '$lib/components/ConfigurationManager.svelte';
 
 	let settings = {
+		// Piano configuration
 		piano_size: '88-key',
+		key_mapping: {},
+		mapping_mode: 'auto',
+		key_offset: 0,
+		
+		// GPIO configuration
 		gpio_pin: 18,
-		led_orientation: 'normal'
+		gpio_power_pin: null,
+		gpio_ground_pin: null,
+		signal_level: 3.3,
+		led_frequency: 800000,
+		led_dma: 10,
+		led_channel: 0,
+		led_invert: false,
+		
+		// LED strip configuration
+		led_count: 246,
+		max_led_count: 300,
+		led_type: 'WS2812B',
+		led_orientation: 'normal',
+		led_strip_type: 'WS2811_STRIP_GRB',
+		power_supply_voltage: 5.0,
+		power_supply_current: 10.0,
+		brightness: 0.5,
+		
+		// Advanced settings
+		color_temperature: 6500,
+		gamma_correction: 2.2,
+		color_balance: { red: 1.0, green: 1.0, blue: 1.0 },
+		auto_detect_hardware: true,
+		validate_gpio_pins: true,
+		hardware_test_enabled: true
 	};
 
 	let loading = false;
 	let message = '';
-	let messageType = 'info'; // 'success', 'error', 'info'
+	let messageType = 'info';
+	let activeTab = 'piano';
+	let hasUnsavedChanges = false;
+	let originalSettings = {};
+
+	const tabs = [
+		{ id: 'piano', label: 'Piano Setup', icon: '🎹' },
+		{ id: 'gpio', label: 'GPIO Config', icon: '🔌' },
+		{ id: 'led', label: 'LED Strip', icon: '💡' },
+		{ id: 'mapping', label: 'Key Mapping', icon: '🗂️' },
+    { id: 'test', label: 'LED Test', icon: '🧪' },
+    { id: 'advanced', label: 'Advanced', icon: '⚙️' },
+    { id: 'config', label: 'Config Management', icon: '📁' }
+  ];
 
 	const pianoSizes = [
 		{ value: '25-key', label: '25 Key (2 Octaves)' },
@@ -32,15 +80,20 @@
 
 	async function loadSettings() {
 		try {
+			loading = true;
 			const response = await fetch('/api/settings');
 			if (response.ok) {
 				settings = await response.json();
+				originalSettings = JSON.parse(JSON.stringify(settings));
+				hasUnsavedChanges = false;
 			} else {
 				showMessage('Failed to load settings', 'error');
 			}
 		} catch (error) {
 			console.error('Error loading settings:', error);
 			showMessage('Error loading settings', 'error');
+		} finally {
+			loading = false;
 		}
 	}
 
@@ -56,6 +109,8 @@
 			});
 
 			if (response.ok) {
+				originalSettings = JSON.parse(JSON.stringify(settings));
+				hasUnsavedChanges = false;
 				showMessage('Settings saved successfully!', 'success');
 			} else {
 				const error = await response.json();
@@ -67,6 +122,46 @@
 		} finally {
 			loading = false;
 		}
+	}
+
+	function resetSettings() {
+		if (confirm('Are you sure you want to reset all changes?')) {
+			settings = JSON.parse(JSON.stringify(originalSettings));
+			hasUnsavedChanges = false;
+			showMessage('Settings reset to last saved state', 'info');
+		}
+	}
+
+	async function testHardware() {
+		try {
+			loading = true;
+			showMessage('Testing hardware configuration...', 'info');
+			
+			const response = await fetch('/api/test-hardware', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify(settings)
+			});
+
+			if (response.ok) {
+				const result = await response.json();
+				showMessage(`Hardware test ${result.success ? 'passed' : 'failed'}: ${result.message}`, result.success ? 'success' : 'error');
+			} else {
+				showMessage('Hardware test failed', 'error');
+			}
+		} catch (error) {
+			console.error('Error testing hardware:', error);
+			showMessage('Error testing hardware', 'error');
+		} finally {
+			loading = false;
+		}
+	}
+
+	function handleSettingsChange(newSettings) {
+		settings = { ...settings, ...newSettings };
+		hasUnsavedChanges = JSON.stringify(settings) !== JSON.stringify(originalSettings);
 	}
 
 	function showMessage(text, type) {
@@ -82,91 +177,196 @@
 	<title>Settings - Piano LED</title>
 </svelte:head>
 
-<div class="container mx-auto px-4 py-8 max-w-2xl">
-	<div class="bg-white rounded-lg shadow-lg p-6">
-		<h1 class="text-3xl font-bold text-gray-800 mb-6">Hardware Settings</h1>
+<div class="container mx-auto px-4 py-8 max-w-6xl">
+	<div class="bg-white rounded-lg shadow-lg">
+		<div class="p-6 border-b border-gray-200">
+			<h1 class="text-3xl font-bold text-gray-800 mb-2">Piano LED Configuration</h1>
+			<p class="text-gray-600">Configure your piano LED system hardware and settings</p>
+		</div>
 
 		{#if message}
-			<div class="mb-4 p-4 rounded-md {messageType === 'success' ? 'bg-green-100 text-green-700 border border-green-300' : messageType === 'error' ? 'bg-red-100 text-red-700 border border-red-300' : 'bg-blue-100 text-blue-700 border border-blue-300'}">
+			<div class="mx-6 mt-4 p-4 rounded-md {messageType === 'success' ? 'bg-green-100 text-green-700 border border-green-300' : messageType === 'error' ? 'bg-red-100 text-red-700 border border-red-300' : 'bg-blue-100 text-blue-700 border border-blue-300'}">
 				{message}
 			</div>
 		{/if}
 
-		<form on:submit|preventDefault={saveSettings} class="space-y-6">
-			<!-- Piano Size Selection -->
-			<div>
-				<label for="piano_size" class="block text-sm font-medium text-gray-700 mb-2">
-					Piano Size
-				</label>
-				<select
-					id="piano_size"
-					bind:value={settings.piano_size}
-					class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-				>
-					{#each pianoSizes as size}
-						<option value={size.value}>{size.label}</option>
-					{/each}
-				</select>
-				<p class="mt-1 text-sm text-gray-500">
-					Select the size of your piano keyboard for accurate LED mapping.
-				</p>
-			</div>
+		<!-- Tab Navigation -->
+		<div class="border-b border-gray-200">
+			<nav class="flex space-x-8 px-6" aria-label="Tabs">
+				{#each tabs as tab}
+					<button
+						on:click={() => activeTab = tab.id}
+						class="{activeTab === tab.id ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors"
+					>
+						<span class="mr-2">{tab.icon}</span>
+						{tab.label}
+					</button>
+				{/each}
+			</nav>
+		</div>
 
-			<!-- GPIO Pin Selection -->
-			<div>
-				<label for="gpio_pin" class="block text-sm font-medium text-gray-700 mb-2">
-					GPIO Pin
-				</label>
-				<input
-					id="gpio_pin"
-					type="number"
-					min="1"
-					max="40"
-					bind:value={settings.gpio_pin}
-					class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+		<!-- Tab Content -->
+		<div class="p-6">
+			{#if activeTab === 'piano'}
+				<PianoKeyboardSelector 
+					bind:settings={settings}
+					on:change={(e) => handleSettingsChange(e.detail)}
 				/>
-				<p class="mt-1 text-sm text-gray-500">
-					GPIO pin number for LED strip data connection (typically 18).
-				</p>
-			</div>
+			{:else if activeTab === 'gpio'}
+				<GPIOConfigPanel 
+					bind:settings={settings}
+					on:change={(e) => handleSettingsChange(e.detail)}
+				/>
+			{:else if activeTab === 'led'}
+				<LEDStripConfig 
+					bind:settings={settings}
+					on:change={(e) => handleSettingsChange(e.detail)}
+				/>
+			{:else if activeTab === 'test'}
+				<LEDTestSequence 
+					bind:settings={settings}
+					on:change={(e) => handleSettingsChange(e.detail)}
+				/>
+			{:else if activeTab === 'config'}
+				<ConfigurationManager 
+					bind:settings={settings}
+					on:change={(e) => handleSettingsChange(e.detail)}
+				/>
+			{:else if activeTab === 'advanced'}
+				<div class="space-y-6">
+					<h3 class="text-lg font-medium text-gray-900">Advanced Settings</h3>
+					
+					<!-- Color Temperature -->
+					<div>
+						<label for="color_temperature" class="block text-sm font-medium text-gray-700 mb-2">
+							Color Temperature (K)
+						</label>
+						<input
+							id="color_temperature"
+							type="number"
+							min="2700"
+							max="10000"
+							step="100"
+							bind:value={settings.color_temperature}
+							on:input={() => handleSettingsChange({})}
+							class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+						/>
+						<p class="mt-1 text-sm text-gray-500">
+							Adjust the color temperature of white light (2700K = warm, 6500K = daylight, 10000K = cool)
+						</p>
+					</div>
 
-			<!-- LED Orientation Selection -->
-			<div>
-				<label for="led_orientation" class="block text-sm font-medium text-gray-700 mb-2">
-					LED Orientation
-				</label>
-				<select
-					id="led_orientation"
-					bind:value={settings.led_orientation}
-					class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-				>
-					{#each orientations as orientation}
-						<option value={orientation.value}>{orientation.label}</option>
-					{/each}
-				</select>
-				<p class="mt-1 text-sm text-gray-500">
-					Choose how the LED strip is oriented relative to your piano keys.
-				</p>
-			</div>
+					<!-- Gamma Correction -->
+					<div>
+						<label for="gamma_correction" class="block text-sm font-medium text-gray-700 mb-2">
+							Gamma Correction
+						</label>
+						<input
+							id="gamma_correction"
+							type="number"
+							min="1.0"
+							max="3.0"
+							step="0.1"
+							bind:value={settings.gamma_correction}
+							on:input={() => handleSettingsChange({})}
+							class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+						/>
+						<p class="mt-1 text-sm text-gray-500">
+							Gamma correction for more natural color perception (2.2 is standard)
+						</p>
+					</div>
 
-			<!-- Save Button -->
-			<div class="flex justify-between items-center pt-4">
+					<!-- Hardware Detection -->
+					<div class="space-y-4">
+						<h4 class="text-md font-medium text-gray-900">Hardware Detection</h4>
+						
+						<div class="flex items-center">
+							<input
+								id="auto_detect_hardware"
+								type="checkbox"
+								bind:checked={settings.auto_detect_hardware}
+								on:change={() => handleSettingsChange({})}
+								class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+							/>
+							<label for="auto_detect_hardware" class="ml-2 block text-sm text-gray-900">
+								Auto-detect hardware configuration
+							</label>
+						</div>
+
+						<div class="flex items-center">
+							<input
+								id="validate_gpio_pins"
+								type="checkbox"
+								bind:checked={settings.validate_gpio_pins}
+								on:change={() => handleSettingsChange({})}
+								class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+							/>
+							<label for="validate_gpio_pins" class="ml-2 block text-sm text-gray-900">
+								Validate GPIO pin assignments
+							</label>
+						</div>
+
+						<div class="flex items-center">
+							<input
+								id="hardware_test_enabled"
+								type="checkbox"
+								bind:checked={settings.hardware_test_enabled}
+								on:change={() => handleSettingsChange({})}
+								class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+							/>
+							<label for="hardware_test_enabled" class="ml-2 block text-sm text-gray-900">
+								Enable hardware testing
+							</label>
+						</div>
+					</div>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Action Buttons -->
+		<div class="bg-gray-50 px-6 py-4 flex justify-between items-center rounded-b-lg">
+			<div class="flex space-x-3">
 				<button
 					type="button"
 					on:click={() => goto('/')}
-					class="px-4 py-2 text-gray-600 bg-gray-200 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
+					class="px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
 				>
-					Cancel
+					Back to Home
 				</button>
+				
+				{#if hasUnsavedChanges}
+					<button
+						type="button"
+						on:click={resetSettings}
+						class="px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
+					>
+						Reset Changes
+					</button>
+				{/if}
+			</div>
+
+			<div class="flex space-x-3">
+				{#if settings.hardware_test_enabled}
+					<button
+						type="button"
+						on:click={testHardware}
+						disabled={loading}
+						class="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+					>
+						{loading ? 'Testing...' : 'Test Hardware'}
+					</button>
+				{/if}
+				
 				<button
-					type="submit"
-					disabled={loading}
+					type="button"
+					on:click={saveSettings}
+					disabled={loading || !hasUnsavedChanges}
 					class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 				>
-					{loading ? 'Saving...' : 'Save Settings'}
+					{loading ? 'Saving...' : hasUnsavedChanges ? 'Save Settings' : 'Settings Saved'}
 				</button>
 			</div>
-		</form>
+		</div>
 	</div>
 </div>
 

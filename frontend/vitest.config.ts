@@ -5,12 +5,18 @@ export default defineConfig({
 	plugins: [
 		svelte({
 			compilerOptions: {
-				dev: true
+				dev: true,
+				generate: 'dom'
+			},
+			onwarn: (warning, handler) => {
+				// Suppress warnings during testing
+				if (warning.code === 'css-unused-selector') return;
+				handler(warning);
 			}
 		})
 	],
 	test: {
-		environment: 'jsdom',
+		environment: 'happy-dom',
 		globals: true,
 		setupFiles: ['./src/test-setup.ts'],
 		include: ['src/**/*.{test,spec}.{js,ts}'],

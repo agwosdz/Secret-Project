@@ -17,10 +17,40 @@ DEFAULT_CONFIG = {
     "led_count": 246,  # Default LED count
     "max_led_count": 300,  # Maximum allowed LED count
     "brightness": 0.5,  # Default brightness
-    "pin": 19,  # Default GPIO pin
-    "piano_size": "88-key",  # Piano size: 61-key, 76-key, 88-key, custom
-    "gpio_pin": 19,  # GPIO pin for LED strip
-    "led_orientation": "normal",  # LED orientation: normal, inverted
+    "pin": 19,  # Default GPIO pin (legacy)
+    "piano_size": "88-key",  # Piano size: 25-key, 37-key, 49-key, 61-key, 76-key, 88-key, custom
+    "gpio_pin": 19,  # GPIO pin for LED strip data
+    "led_orientation": "normal",  # LED orientation: normal, reversed
+    
+    # Extended hardware configuration
+    "led_type": "WS2812B",  # LED strip type: WS2812B, WS2813, WS2815, etc.
+    "power_supply_voltage": 5.0,  # Power supply voltage (V)
+    "power_supply_current": 10.0,  # Power supply max current (A)
+    "gpio_power_pin": None,  # Optional GPIO pin for power control
+    "gpio_ground_pin": None,  # Optional GPIO pin for ground reference
+    "signal_level": 3.3,  # Signal voltage level (V)
+    
+    # Piano key mapping configuration
+    "key_mapping": {},  # Custom key-to-LED mapping {midi_note: led_index}
+    "mapping_mode": "auto",  # Mapping mode: auto, custom
+    "key_offset": 0,  # Offset for key mapping alignment
+    
+    # Advanced timing and performance settings
+    "led_frequency": 800000,  # LED strip frequency (Hz)
+    "led_dma": 10,  # DMA channel for LED control
+    "led_invert": False,  # Invert signal polarity
+    "led_channel": 0,  # PWM channel
+    "led_strip_type": "WS2811_STRIP_GRB",  # Strip color order
+    
+    # Color calibration settings
+    "color_temperature": 6500,  # Color temperature (K)
+    "gamma_correction": 2.2,  # Gamma correction value
+    "color_balance": {"red": 1.0, "green": 1.0, "blue": 1.0},  # RGB balance
+    
+    # Hardware detection and validation
+    "auto_detect_hardware": True,  # Enable automatic hardware detection
+    "validate_gpio_pins": True,  # Validate GPIO pin availability
+    "hardware_test_enabled": True,  # Enable hardware testing features
 }
 
 # Configuration file path
@@ -88,6 +118,12 @@ def validate_config(config):
         if not isinstance(config["gpio_pin"], int) or not (0 <= config["gpio_pin"] <= 27):
             errors.append("gpio_pin must be an integer between 0 and 27")
     
+    # Validate optional GPIO pins
+    for pin_name in ["gpio_power_pin", "gpio_ground_pin"]:
+        if pin_name in config and config[pin_name] is not None:
+            if not isinstance(config[pin_name], int) or not (0 <= config[pin_name] <= 27):
+                errors.append(f"{pin_name} must be an integer between 0 and 27 or None")
+    
     # Validate piano size
     if "piano_size" in config:
         valid_sizes = ["25-key", "37-key", "49-key", "61-key", "76-key", "88-key", "custom"]
@@ -105,17 +141,343 @@ def validate_config(config):
         if not isinstance(config["brightness"], (int, float)) or not (0.0 <= config["brightness"] <= 1.0):
             errors.append("brightness must be a number between 0.0 and 1.0")
     
+    # Validate LED type
+    if "led_type" in config:
+        valid_led_types = ["WS2812B", "WS2813", "WS2815", "APA102", "SK6812"]
+        if config["led_type"] not in valid_led_types:
+            errors.append(f"led_type must be one of: {', '.join(valid_led_types)}")
+    
+    # Validate power supply settings
+    if "power_supply_voltage" in config:
+        voltage = config["power_supply_voltage"]
+        if not isinstance(voltage, (int, float)) or not (3.0 <= voltage <= 12.0):
+            errors.append("power_supply_voltage must be between 3.0V and 12.0V")
+    
+    if "power_supply_current" in config:
+        current = config["power_supply_current"]
+        if not isinstance(current, (int, float)) or not (0.5 <= current <= 50.0):
+            errors.append("power_supply_current must be between 0.5A and 50.0A")
+    
+    # Validate signal level
+    if "signal_level" in config:
+        signal_level = config["signal_level"]
+        if signal_level not in [3.3, 5.0]:
+            errors.append("signal_level must be either 3.3V or 5.0V")
+    
+    # Validate mapping mode
+    if "mapping_mode" in config:
+        valid_mapping_modes = ["auto", "custom"]
+        if config["mapping_mode"] not in valid_mapping_modes:
+            errors.append(f"mapping_mode must be one of: {', '.join(valid_mapping_modes)}")
+    
+    # Validate LED frequency
+    if "led_frequency" in config:
+        frequency = config["led_frequency"]
+        if frequency not in [400000, 800000]:
+            errors.append("led_frequency must be either 400000Hz or 800000Hz")
+    
+    # Validate color temperature
+    if "color_temperature" in config:
+        color_temp = config["color_temperature"]
+        if not isinstance(color_temp, (int, float)) or not (2700 <= color_temp <= 10000):
+            errors.append("color_temperature must be between 2700K and 10000K")
+    
+    # Validate gamma correction
+    if "gamma_correction" in config:
+        gamma = config["gamma_correction"]
+        if not isinstance(gamma, (int, float)) or not (1.0 <= gamma <= 3.0):
+            errors.append("gamma_correction must be between 1.0 and 3.0")
+    
+    # Validate color balance
+    if "color_balance" in config:
+        color_balance = config["color_balance"]
+        if not isinstance(color_balance, dict):
+            errors.append("color_balance must be a dictionary")
+        else:
+            for color in ["red", "green", "blue"]:
+                if color not in color_balance:
+                    errors.append(f"color_balance must include {color} value")
+                elif not isinstance(color_balance[color], (int, float)) or not (0.0 <= color_balance[color] <= 2.0):
+                    errors.append(f"color_balance.{color} must be between 0.0 and 2.0")
+    
+    # Validate key mapping
+    if "key_mapping" in config:
+        key_mapping = config["key_mapping"]
+        if not isinstance(key_mapping, dict):
+            errors.append("key_mapping must be a dictionary")
+        else:
+            for midi_note, led_index in key_mapping.items():
+                try:
+                    midi_note_int = int(midi_note)
+                    if not (0 <= midi_note_int <= 127):
+                        errors.append(f"MIDI note {midi_note} must be between 0 and 127")
+                except ValueError:
+                    errors.append(f"MIDI note {midi_note} must be a valid integer")
+                
+                if not isinstance(led_index, int) or led_index < 0:
+                    errors.append(f"LED index {led_index} must be a non-negative integer")
+    
     return errors
+
+
+def validate_config_comprehensive(config):
+    """Comprehensive configuration validation with cross-field checks"""
+    errors = validate_config(config)
+    warnings = []
+    
+    # Cross-validation: Power consumption vs supply capacity
+    if all(key in config for key in ["led_count", "brightness", "led_type", "power_supply_current"]):
+        power_consumption = calculate_led_power_consumption(
+            config["led_count"], 
+            config["brightness"], 
+            config["led_type"]
+        )
+        max_power = config["power_supply_voltage"] * config["power_supply_current"]
+        
+        if power_consumption["total_watts"] > max_power:
+            errors.append(
+                f"Power consumption ({power_consumption['total_watts']:.1f}W) exceeds "
+                f"power supply capacity ({max_power:.1f}W)"
+            )
+        elif power_consumption["total_watts"] > max_power * 0.8:
+            warnings.append(
+                f"Power consumption ({power_consumption['total_watts']:.1f}W) is close to "
+                f"power supply capacity ({max_power:.1f}W). Consider reducing brightness or LED count."
+            )
+    
+    # Cross-validation: GPIO pin conflicts
+    gpio_pins = []
+    for pin_key in ["gpio_pin", "gpio_power_pin", "gpio_ground_pin"]:
+        if pin_key in config and config[pin_key] is not None:
+            pin = config[pin_key]
+            if pin in gpio_pins:
+                errors.append(f"GPIO pin {pin} is used multiple times")
+            gpio_pins.append(pin)
+    
+    # Cross-validation: Piano size vs LED count consistency
+    if "piano_size" in config and "led_count" in config and config["piano_size"] != "custom":
+        piano_specs = get_piano_specs(config["piano_size"])
+        recommended_leds = piano_specs["keys"] * 3  # Rough estimate
+        
+        if abs(config["led_count"] - recommended_leds) > recommended_leds * 0.5:
+            warnings.append(
+                f"LED count ({config['led_count']}) seems inconsistent with piano size "
+                f"({config['piano_size']}). Recommended: ~{recommended_leds} LEDs"
+            )
+    
+    return {
+        "valid": len(errors) == 0,
+        "errors": errors,
+        "warnings": warnings
+    }
+
+
+def backup_config():
+    """Create a backup of the current configuration"""
+    try:
+        if CONFIG_FILE.exists():
+            backup_file = CONFIG_FILE.with_suffix('.json.backup')
+            import shutil
+            shutil.copy2(CONFIG_FILE, backup_file)
+            logger.info(f"Configuration backed up to {backup_file}")
+            return True
+    except Exception as e:
+        logger.error(f"Failed to backup configuration: {e}")
+        return False
+
+
+def restore_config_from_backup():
+    """Restore configuration from backup"""
+    try:
+        backup_file = CONFIG_FILE.with_suffix('.json.backup')
+        if backup_file.exists():
+            import shutil
+            shutil.copy2(backup_file, CONFIG_FILE)
+            logger.info(f"Configuration restored from {backup_file}")
+            return True
+        else:
+            logger.warning("No backup file found")
+            return False
+    except Exception as e:
+        logger.error(f"Failed to restore configuration: {e}")
+        return False
+
+
+def reset_config_to_defaults():
+    """Reset configuration to default values"""
+    try:
+        backup_config()  # Backup current config first
+        save_config(DEFAULT_CONFIG.copy())
+        logger.info("Configuration reset to defaults")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to reset configuration: {e}")
+        return False
+
+
+def export_config(export_path):
+    """Export configuration to a specified file"""
+    try:
+        config = load_config()
+        export_file = Path(export_path)
+        
+        with open(export_file, 'w') as f:
+            json.dump(config, f, indent=2)
+        
+        logger.info(f"Configuration exported to {export_file}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to export configuration: {e}")
+        return False
+
+
+def import_config(import_path, validate_before_save=True):
+    """Import configuration from a specified file"""
+    try:
+        import_file = Path(import_path)
+        
+        if not import_file.exists():
+            logger.error(f"Import file {import_file} does not exist")
+            return False
+        
+        with open(import_file, 'r') as f:
+            imported_config = json.load(f)
+        
+        if validate_before_save:
+            validation_result = validate_config_comprehensive(imported_config)
+            if not validation_result["valid"]:
+                logger.error(f"Imported configuration is invalid: {validation_result['errors']}")
+                return False
+        
+        backup_config()  # Backup current config first
+        save_config(imported_config)
+        logger.info(f"Configuration imported from {import_file}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to import configuration: {e}")
+        return False
+
+
+def get_config_history():
+    """Get configuration change history (if backup files exist)"""
+    try:
+        config_dir = CONFIG_FILE.parent
+        backup_files = list(config_dir.glob("config.json.backup*"))
+        
+        history = []
+        for backup_file in sorted(backup_files, key=lambda x: x.stat().st_mtime, reverse=True):
+            stat = backup_file.stat()
+            history.append({
+                "file": str(backup_file),
+                "modified": stat.st_mtime,
+                "size": stat.st_size
+            })
+        
+        return history
+    except Exception as e:
+        logger.error(f"Failed to get configuration history: {e}")
+        return []
 
 
 def get_piano_specs(piano_size):
     """Get piano specifications based on size"""
     specs = {
-        "25-key": {"num_keys": 25, "min_midi_note": 60, "max_midi_note": 84},   # C4-C6 (2 octaves)
-        "37-key": {"num_keys": 37, "min_midi_note": 48, "max_midi_note": 84},   # C3-C6 (3 octaves)
-        "49-key": {"num_keys": 49, "min_midi_note": 36, "max_midi_note": 84},   # C2-C6 (4 octaves)
-        "61-key": {"num_keys": 61, "min_midi_note": 36, "max_midi_note": 96},   # C2-C7 (5 octaves)
-        "76-key": {"num_keys": 76, "min_midi_note": 28, "max_midi_note": 103},  # E1-G7 (6+ octaves)
-        "88-key": {"num_keys": 88, "min_midi_note": 21, "max_midi_note": 108},  # A0-C8 (full piano)
+        "25-key": {"keys": 25, "octaves": 2, "start_note": "C3", "end_note": "C5", "midi_start": 48, "midi_end": 72},
+        "37-key": {"keys": 37, "octaves": 3, "start_note": "C2", "end_note": "C5", "midi_start": 36, "midi_end": 72},
+        "49-key": {"keys": 49, "octaves": 4, "start_note": "C2", "end_note": "C6", "midi_start": 36, "midi_end": 84},
+        "61-key": {"keys": 61, "octaves": 5, "start_note": "C2", "end_note": "C7", "midi_start": 36, "midi_end": 96},
+        "76-key": {"keys": 76, "octaves": 6.25, "start_note": "E1", "end_note": "G7", "midi_start": 28, "midi_end": 103},
+        "88-key": {"keys": 88, "octaves": 7.25, "start_note": "A0", "end_note": "C8", "midi_start": 21, "midi_end": 108},
+        "custom": {"keys": 0, "octaves": 0, "start_note": "", "end_note": "", "midi_start": 0, "midi_end": 127}
     }
-    return specs.get(piano_size, specs["88-key"])  # Default to 88-key
+    return specs.get(piano_size, specs["88-key"])
+
+
+def calculate_led_power_consumption(led_count, brightness=1.0, led_type="WS2812B"):
+    """Calculate estimated power consumption for LED strip"""
+    # Power consumption per LED at full brightness (mA)
+    led_power_specs = {
+        "WS2812B": 60,  # ~60mA per LED at full white
+        "WS2813": 60,
+        "WS2815": 60,
+        "APA102": 60,
+        "SK6812": 60
+    }
+    
+    power_per_led = led_power_specs.get(led_type, 60)
+    total_current = (led_count * power_per_led * brightness) / 1000  # Convert to Amps
+    
+    return {
+        "current_amps": round(total_current, 2),
+        "current_ma": round(total_current * 1000),
+        "power_5v_watts": round(total_current * 5.0, 2),
+        "recommended_supply_amps": round(total_current * 1.2, 2)  # 20% safety margin
+    }
+
+
+def generate_auto_key_mapping(piano_size, led_count, led_orientation="normal"):
+    """Generate automatic key-to-LED mapping based on piano size and LED count"""
+    specs = get_piano_specs(piano_size)
+    key_count = specs["keys"]
+    
+    if key_count == 0:  # Custom piano size
+        return {}
+    
+    # Calculate LEDs per key
+    leds_per_key = led_count // key_count
+    remaining_leds = led_count % key_count
+    
+    mapping = {}
+    led_index = 0
+    
+    for key_num in range(key_count):
+        midi_note = specs["midi_start"] + key_num
+        
+        # Distribute remaining LEDs among first keys
+        key_led_count = leds_per_key + (1 if key_num < remaining_leds else 0)
+        
+        # Create LED range for this key
+        led_range = list(range(led_index, led_index + key_led_count))
+        
+        # Reverse LED order if orientation is reversed
+        if led_orientation == "reversed":
+            led_range = led_range[::-1]
+        
+        mapping[midi_note] = led_range
+        led_index += key_led_count
+    
+    # Reverse entire mapping if orientation is reversed
+    if led_orientation == "reversed":
+        total_leds = led_count - 1
+        reversed_mapping = {}
+        for midi_note, led_list in mapping.items():
+            reversed_mapping[midi_note] = [total_leds - led for led in led_list]
+        mapping = reversed_mapping
+    
+    return mapping
+
+
+def validate_gpio_pin_availability(pin, exclude_pins=None):
+    """Validate if a GPIO pin is available for use"""
+    if exclude_pins is None:
+        exclude_pins = []
+    
+    # Reserved pins that should not be used
+    reserved_pins = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14, 15, 16, 17, 30, 31]
+    
+    # Power and ground pins
+    power_ground_pins = [1, 2, 4, 6, 9, 14, 17, 20, 25, 30, 34, 39]
+    
+    if pin in reserved_pins:
+        return False, "Pin is reserved for system use"
+    
+    if pin in power_ground_pins:
+        return False, "Pin is a power or ground pin"
+    
+    if pin in exclude_pins:
+        return False, "Pin is already in use"
+    
+    if not 0 <= pin <= 40:
+        return False, "Pin number out of valid range (0-40)"
+    
+    return True, "Pin is available"
