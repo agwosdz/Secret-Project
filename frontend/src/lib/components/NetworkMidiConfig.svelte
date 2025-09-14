@@ -85,10 +85,10 @@
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify({
-					session_id: session.id,
-					ip_address: session.ip_address,
-					port: session.port
-				})
+				session_name: session.name || session.id,
+				host: session.ip_address,
+				port: session.port
+			})
 			});
 
 			if (!response.ok) {
@@ -154,10 +154,10 @@
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify({
-					ip_address: manualIp,
-					port: manualPort,
-					name: manualName
-				})
+				session_name: manualName,
+				host: manualIp,
+				port: manualPort
+			})
 			});
 
 			if (!response.ok) {
