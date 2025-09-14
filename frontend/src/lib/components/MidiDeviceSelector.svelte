@@ -48,9 +48,8 @@
 		error = null;
 
 		try {
-			// Use direct backend URL since proxy might not be working
-			const backendUrl = 'http://192.168.1.225:5001';
-			const response = await fetch(`${backendUrl}/api/midi-input/devices`);
+			// Use relative URL to work with Vite proxy configuration
+			const response = await fetch('/api/midi-input/devices');
 			if (!response.ok) {
 				throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 			}

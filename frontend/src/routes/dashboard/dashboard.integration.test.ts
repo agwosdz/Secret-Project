@@ -58,7 +58,7 @@ describe('Dashboard Integration Tests', () => {
 		container = testContainer;
 
 		// Should call io to create socket connection
-		expect(io).toHaveBeenCalledWith('ws://192.168.1.225:3001', expect.objectContaining({
+		expect(io).toHaveBeenCalledWith('ws://localhost:5001', expect.objectContaining({
 			reconnection: true,
 			reconnectionAttempts: 5,
 			reconnectionDelay: 1000
