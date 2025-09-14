@@ -1107,7 +1107,7 @@ def update_settings():
         hardware_fields = ['gpio_pin', 'led_count', 'led_frequency', 'led_dma', 'led_channel', 'led_invert', 'brightness', 'led_orientation']
         if any(field in data for field in hardware_fields) and led_controller:
             try:
-                global led_controller
+                global led_controller, playback_service, midi_input_manager
                 # Clean up existing controller
                 if hasattr(led_controller, 'cleanup'):
                     led_controller.cleanup()
@@ -1121,7 +1121,6 @@ def update_settings():
                 logger.info("LED controller reinitialized with new settings")
                 
                 # Reinitialize playback service with new LED controller and configuration
-                global playback_service
                 if playback_service:
                     # Stop current playback and clean up
                     playback_service.stop_playback()
@@ -1132,7 +1131,6 @@ def update_settings():
                     logger.info("Playback service reinitialized with new LED controller and configuration")
                     
                 # Update MIDI input manager with new LED controller
-                global midi_input_manager
                 if midi_input_manager and hasattr(midi_input_manager, '_led_controller'):
                     midi_input_manager._led_controller = led_controller
                     # Reinitialize USB MIDI service if it exists
