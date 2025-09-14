@@ -35,7 +35,7 @@ except ImportError:
     def get_config(key, default):
         return default
     def get_piano_specs(piano_size):
-        return {'led_count': 88, 'min_midi_note': 21, 'max_midi_note': 108}
+        return {'keys': 88, 'midi_start': 21, 'midi_end': 108}
 
 class PlaybackState(Enum):
     """Playback state enumeration"""
@@ -83,9 +83,9 @@ class PlaybackService:
         piano_size = get_config('piano_size', '88-key')
         piano_specs = get_piano_specs(piano_size)
         
-        self.num_leds = num_leds or piano_specs['num_keys']
-        self.min_midi_note = piano_specs['min_midi_note']
-        self.max_midi_note = piano_specs['max_midi_note']
+        self.num_leds = num_leds or piano_specs['keys']
+        self.min_midi_note = piano_specs['midi_start']
+        self.max_midi_note = piano_specs['midi_end']
         self.led_orientation = get_config('led_orientation', 'normal')
         
         self._midi_parser = midi_parser or (MIDIParser() if MIDIParser else None)

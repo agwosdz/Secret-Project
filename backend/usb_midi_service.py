@@ -30,7 +30,7 @@ except ImportError:
     def get_config(key, default=None):
         return default
     def get_piano_specs(piano_size):
-        return {'min_midi_note': 21, 'max_midi_note': 108, 'num_keys': 88}
+        return {'midi_start': 21, 'midi_end': 108, 'keys': 88}
 
 class MIDIInputState(Enum):
     """MIDI input service state enumeration"""
@@ -74,9 +74,9 @@ class USBMIDIInputService:
         # Load configuration
         piano_size = get_config('piano_size', '88-key')
         piano_specs = get_piano_specs(piano_size)
-        self.num_leds = piano_specs['num_keys']
-        self.min_midi_note = piano_specs['min_midi_note']
-        self.max_midi_note = piano_specs['max_midi_note']
+        self.num_leds = piano_specs['keys']
+        self.min_midi_note = piano_specs['midi_start']
+        self.max_midi_note = piano_specs['midi_end']
         self.led_orientation = get_config('led_orientation', 'normal')
         
         # Service state
