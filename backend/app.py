@@ -1272,6 +1272,25 @@ def api_dashboard():
             'message': 'An unexpected error occurred while loading dashboard data'
         }), 500
 
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint for monitoring and frontend connectivity"""
+    try:
+        return jsonify({
+            'status': 'healthy',
+            'message': 'Piano LED Visualizer Backend is running',
+            'timestamp': datetime.datetime.now().isoformat(),
+            'version': '1.0.0'
+        }), 200
+    except Exception as e:
+        logger.error(f"Error in health check endpoint: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Health check failed',
+            'timestamp': datetime.datetime.now().isoformat(),
+            'error': str(e)
+        }), 500
+
 @app.errorhandler(404)
 def not_found(error):
     """Handle 404 errors"""
