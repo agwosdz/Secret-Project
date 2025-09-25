@@ -88,6 +88,14 @@ class PlaybackService:
         self.max_midi_note = piano_specs['midi_end']
         self.led_orientation = get_config('led_orientation', 'normal')
         
+        # Load multi-LED mapping configuration
+        self.mapping_mode = get_config('mapping_mode', 'auto')
+        self.leds_per_key = get_config('leds_per_key', 3)
+        self.mapping_base_offset = get_config('mapping_base_offset', 0)
+        self.key_mapping = get_config('key_mapping', {})
+        
+        # Precompute key-to-LED mapping for performance
+        self._precomputed_mapping = self._generate_key_mapping()
         self._midi_parser = midi_parser or (MIDIParser() if MIDIParser else None)
         
         # Playback state
@@ -638,14 +646,17 @@ class PlaybackService:
             # Prepare LED data for batch update
             led_data = {}
             
-            # Map active notes to LEDs
+            # Map active notes to LEDs using multi-LED mapping
             for note in self._active_notes.keys():
-                led_index = self._map_note_to_led(note)
-                if 0 <= led_index < self.num_leds:
-                    color = self._get_note_color(note)
-                    # Apply volume multiplier to brightness
-                    adjusted_color = tuple(int(c * self._volume_multiplier) for c in color)
-                    led_data[led_index] = adjusted_color
+                led_indices = self._map_note_to_leds(note)
+                color = self._get_note_color(note)
+                # Apply volume multiplier to brightness
+                adjusted_color = tuple(int(c * self._volume_multiplier) for c in color)
+                
+                # Set color for all LEDs mapped to this note
+                for led_index in led_indices:
+                    if 0 <= led_index < self.num_leds:
+                        led_data[led_index] = adjusted_color
             
             # Turn off all LEDs first, then set active ones
             self._led_controller.turn_off_all()
@@ -682,6 +693,79 @@ class PlaybackService:
             return self.num_leds - 1 - logical_index
         else:
             return logical_index
+    
+    def _map_note_to_leds(self, note: int) -> List[int]:
+        """
+        Map MIDI note to multiple LED indices based on configuration.
+        
+        Args:
+            note: MIDI note number (0-127)
+            
+        Returns:
+            List[int]: List of LED indices for this note
+        """
+        # Use precomputed mapping if available
+        if note in self._precomputed_mapping:
+            return self._precomputed_mapping[note]
+        
+        # Fallback to single LED mapping for backward compatibility
+        single_led = self._map_note_to_led(note)
+        return [single_led] if 0 <= single_led < self.num_leds else []
+    
+    def _generate_key_mapping(self) -> Dict[int, List[int]]:
+        """
+        Generate key-to-LED mapping based on configuration.
+        
+        Returns:
+            Dict[int, List[int]]: Mapping of MIDI note to list of LED indices
+        """
+        try:
+            from config import generate_auto_key_mapping
+            
+            if self.mapping_mode == 'manual' and self.key_mapping:
+                # Use manual mapping from configuration
+                mapping = {}
+                for note_str, led_indices in self.key_mapping.items():
+                    try:
+                        note = int(note_str)
+                        if isinstance(led_indices, int):
+                            mapping[note] = [led_indices]
+                        elif isinstance(led_indices, list):
+                            mapping[note] = led_indices
+                    except (ValueError, TypeError):
+                        continue
+                return mapping
+            
+            elif self.mapping_mode in ['auto', 'proportional']:
+                # Use auto-generated mapping
+                piano_size = get_config('piano_size', '88-key')
+                auto_mapping = generate_auto_key_mapping(
+                    piano_size=piano_size,
+                    led_count=self.num_leds,
+                    led_orientation=self.led_orientation,
+                    leds_per_key=self.leds_per_key,
+                    mapping_base_offset=self.mapping_base_offset
+                )
+                return auto_mapping
+            
+            else:
+                # Fallback to single LED mapping
+                mapping = {}
+                for note in range(self.min_midi_note, self.max_midi_note + 1):
+                    single_led = self._map_note_to_led(note)
+                    if 0 <= single_led < self.num_leds:
+                        mapping[note] = [single_led]
+                return mapping
+                
+        except Exception as e:
+            self.logger.error(f"Error generating key mapping: {e}")
+            # Fallback to single LED mapping
+            mapping = {}
+            for note in range(self.min_midi_note, self.max_midi_note + 1):
+                single_led = self._map_note_to_led(note)
+                if 0 <= single_led < self.num_leds:
+                    mapping[note] = [single_led]
+            return mapping
     
     def _get_note_color(self, note: int) -> tuple:
         """

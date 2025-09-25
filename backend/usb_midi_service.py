@@ -72,12 +72,21 @@ class USBMIDIInputService:
         self._websocket_callback = websocket_callback
         
         # Load configuration
-        piano_size = get_config('piano_size', '88-key')
-        piano_specs = get_piano_specs(piano_size)
+        self.piano_size = get_config('piano_size', '88-key')
+        piano_specs = get_piano_specs(self.piano_size)
         self.num_leds = piano_specs['keys']
         self.min_midi_note = piano_specs['midi_start']
         self.max_midi_note = piano_specs['midi_end']
         self.led_orientation = get_config('led_orientation', 'normal')
+        
+        # Multi-LED mapping configuration
+        self.mapping_mode = get_config('mapping_mode', 'auto')
+        self.leds_per_key = get_config('leds_per_key', 3)
+        self.mapping_base_offset = get_config('mapping_base_offset', 0)
+        self.key_mapping = get_config('key_mapping', {})
+        
+        # Generate precomputed mapping for performance
+        self._precomputed_mapping = self._generate_key_mapping()
         
         # Service state
         self._state = MIDIInputState.IDLE
@@ -328,9 +337,9 @@ class USBMIDIInputService:
             timestamp: Event timestamp
         """
         try:
-            # Map MIDI note to LED index
-            led_index = self._map_note_to_led(note)
-            if led_index is None:
+            # Map MIDI note to LED indices (multi-LED support)
+            led_indices = self._map_note_to_leds(note)
+            if not led_indices:
                 return  # Note outside LED range
             
             # Calculate LED color and brightness based on velocity
@@ -340,15 +349,18 @@ class USBMIDIInputService:
             # Apply brightness to color
             final_color = tuple(int(c * brightness) for c in color)
             
-            # Update LED
+            # Update all mapped LEDs
             if self._led_controller:
-                self._led_controller.turn_on_led(led_index, final_color, auto_show=True)
+                for led_index in led_indices:
+                    self._led_controller.turn_on_led(led_index, final_color, auto_show=False)
+                # Show all changes at once for better performance
+                self._led_controller.show()
             
-            # Track active note
+            # Track active note with all LED indices
             self._active_notes[note] = {
                 'velocity': velocity,
                 'timestamp': timestamp,
-                'led_index': led_index,
+                'led_indices': led_indices,  # Changed from led_index to led_indices
                 'channel': channel,
                 'color': final_color
             }
@@ -365,7 +377,7 @@ class USBMIDIInputService:
             # Broadcast event
             self._broadcast_midi_event(event)
             
-            self.logger.debug(f"Note ON: {note} (LED {led_index}) velocity {velocity}")
+            self.logger.debug(f"Note ON: {note} (LEDs {led_indices}) velocity {velocity}")
             
         except Exception as e:
             self.logger.error(f"Error handling note on {note}: {e}")
@@ -385,11 +397,18 @@ class USBMIDIInputService:
                 return  # Note wasn't active
             
             note_info = self._active_notes[note]
-            led_index = note_info['led_index']
+            led_indices = note_info.get('led_indices', [])
             
-            # Turn off LED
-            if self._led_controller:
-                self._led_controller.turn_off_led(led_index, auto_show=True)
+            # Handle backward compatibility with old led_index format
+            if not led_indices and 'led_index' in note_info:
+                led_indices = [note_info['led_index']]
+            
+            # Turn off all mapped LEDs
+            if self._led_controller and led_indices:
+                for led_index in led_indices:
+                    self._led_controller.turn_off_led(led_index, auto_show=False)
+                # Show all changes at once for better performance
+                self._led_controller.show()
             
             # Remove from active notes
             del self._active_notes[note]
@@ -406,10 +425,69 @@ class USBMIDIInputService:
             # Broadcast event
             self._broadcast_midi_event(event)
             
-            self.logger.debug(f"Note OFF: {note} (LED {led_index})")
+            self.logger.debug(f"Note OFF: {note} (LEDs {led_indices})")
             
         except Exception as e:
             self.logger.error(f"Error handling note off {note}: {e}")
+    
+    def _generate_key_mapping(self) -> Dict[int, List[int]]:
+        """
+        Generate precomputed key mapping based on configuration.
+        
+        Returns:
+            Dictionary mapping MIDI note to list of LED indices
+        """
+        mapping = {}
+        
+        if self.mapping_mode == 'manual' and self.key_mapping:
+            # Use manual mapping from configuration
+            for note_str, led_indices in self.key_mapping.items():
+                try:
+                    note = int(note_str)
+                    if isinstance(led_indices, int):
+                        mapping[note] = [led_indices]
+                    elif isinstance(led_indices, list):
+                        mapping[note] = led_indices
+                except (ValueError, TypeError):
+                    continue
+        else:
+            # Generate automatic mapping (auto or proportional)
+            from config import generate_auto_key_mapping
+            auto_mapping = generate_auto_key_mapping(
+                piano_size=self.piano_size,
+                led_count=self.num_leds,
+                led_orientation=self.led_orientation,
+                leds_per_key=self.leds_per_key,
+                mapping_base_offset=self.mapping_base_offset
+            )
+            
+            # Convert to our format
+            for note in range(self.min_midi_note, self.max_midi_note + 1):
+                if note in auto_mapping:
+                    led_indices = auto_mapping[note]
+                    if isinstance(led_indices, int):
+                        mapping[note] = [led_indices]
+                    elif isinstance(led_indices, list):
+                        mapping[note] = led_indices
+        
+        return mapping
+    
+    def _map_note_to_leds(self, midi_note: int) -> List[int]:
+        """
+        Map MIDI note number to list of LED indices using precomputed mapping.
+        
+        Args:
+            midi_note: MIDI note number (0-127)
+            
+        Returns:
+            List of physical LED indices or empty list if note is outside range
+        """
+        if midi_note in self._precomputed_mapping:
+            return self._precomputed_mapping[midi_note]
+        
+        # Fallback to single LED mapping for backward compatibility
+        single_led = self._map_note_to_led(midi_note)
+        return [single_led] if single_led is not None else []
     
     def _map_note_to_led(self, midi_note: int) -> Optional[int]:
         """

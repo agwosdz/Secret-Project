@@ -31,9 +31,11 @@ DEFAULT_CONFIG = {
     "signal_level": 3.3,  # Signal voltage level (V)
     
     # Piano key mapping configuration
-    "key_mapping": {},  # Custom key-to-LED mapping {midi_note: led_index}
-    "mapping_mode": "auto",  # Mapping mode: auto, custom
+    "key_mapping": {},  # Custom key-to-LED mapping {midi_note: led_index or [led_indices]}
+    "mapping_mode": "auto",  # Mapping mode: auto, manual, proportional, custom (legacy)
     "key_offset": 0,  # Offset for key mapping alignment
+    "leds_per_key": 3,  # Number of LEDs to light up per key
+    "mapping_base_offset": 0,  # Base offset for the entire mapping
     
     # Advanced timing and performance settings
     "led_frequency": 800000,  # LED strip frequency (Hz)
@@ -166,9 +168,25 @@ def validate_config(config):
     
     # Validate mapping mode
     if "mapping_mode" in config:
-        valid_mapping_modes = ["auto", "custom"]
+        valid_mapping_modes = ["auto", "manual", "proportional", "custom"]
         if config["mapping_mode"] not in valid_mapping_modes:
             errors.append(f"mapping_mode must be one of: {', '.join(valid_mapping_modes)}")
+    
+    # Validate leds_per_key
+    if "leds_per_key" in config:
+        leds_per_key = config["leds_per_key"]
+        if not isinstance(leds_per_key, int) or leds_per_key < 1:
+            errors.append("leds_per_key must be a positive integer")
+        elif leds_per_key > 10:
+            errors.append("leds_per_key cannot exceed 10 for performance reasons")
+    
+    # Validate mapping_base_offset
+    if "mapping_base_offset" in config:
+        mapping_base_offset = config["mapping_base_offset"]
+        if not isinstance(mapping_base_offset, int) or mapping_base_offset < 0:
+            errors.append("mapping_base_offset must be a non-negative integer")
+        elif mapping_base_offset >= config.get("led_count", 300):
+            errors.append("mapping_base_offset must be less than led_count")
     
     # Validate LED frequency
     if "led_frequency" in config:
@@ -206,7 +224,7 @@ def validate_config(config):
         if not isinstance(key_mapping, dict):
             errors.append("key_mapping must be a dictionary")
         else:
-            for midi_note, led_index in key_mapping.items():
+            for midi_note, led_indices in key_mapping.items():
                 try:
                     midi_note_int = int(midi_note)
                     if not (0 <= midi_note_int <= 127):
@@ -214,8 +232,18 @@ def validate_config(config):
                 except ValueError:
                     errors.append(f"MIDI note {midi_note} must be a valid integer")
                 
-                if not isinstance(led_index, int) or led_index < 0:
-                    errors.append(f"LED index {led_index} must be a non-negative integer")
+                # Accept both single LED index (int) and multiple LED indices (list[int])
+                if isinstance(led_indices, int):
+                    if led_indices < 0:
+                        errors.append(f"LED index {led_indices} must be a non-negative integer")
+                elif isinstance(led_indices, list):
+                    if not led_indices:
+                        errors.append(f"LED indices list for MIDI note {midi_note} cannot be empty")
+                    for led_index in led_indices:
+                        if not isinstance(led_index, int) or led_index < 0:
+                            errors.append(f"LED index {led_index} must be a non-negative integer")
+                else:
+                    errors.append(f"LED indices for MIDI note {midi_note} must be an integer or list of integers")
     
     return errors
 
@@ -415,26 +443,57 @@ def calculate_led_power_consumption(led_count, brightness=1.0, led_type="WS2812B
     }
 
 
-def generate_auto_key_mapping(piano_size, led_count, led_orientation="normal"):
-    """Generate automatic key-to-LED mapping based on piano size and LED count"""
+def generate_auto_key_mapping(piano_size, led_count, led_orientation="normal", leds_per_key=None, mapping_base_offset=None):
+    """Generate automatic key-to-LED mapping based on piano size and LED count
+    
+    Args:
+        piano_size: Piano size (e.g., "88-key")
+        led_count: Total number of LEDs
+        led_orientation: LED orientation ("normal" or "reversed")
+        leds_per_key: Number of LEDs per key (overrides calculation if provided)
+        mapping_base_offset: Base offset for the entire mapping (default: 0)
+    
+    Returns:
+        dict: Mapping of MIDI note to list of LED indices
+    """
     specs = get_piano_specs(piano_size)
     key_count = specs["keys"]
     
     if key_count == 0:  # Custom piano size
         return {}
     
+    # Use provided values or calculate defaults
+    if mapping_base_offset is None:
+        mapping_base_offset = 0
+    
+    # Adjust available LED count based on base offset
+    available_leds = led_count - mapping_base_offset
+    if available_leds <= 0:
+        return {}
+    
     # Calculate LEDs per key
-    leds_per_key = led_count // key_count
-    remaining_leds = led_count % key_count
+    if leds_per_key is None:
+        leds_per_key = available_leds // key_count
+        remaining_leds = available_leds % key_count
+    else:
+        # When leds_per_key is specified, calculate how many keys we can map
+        max_mappable_keys = available_leds // leds_per_key
+        if max_mappable_keys < key_count:
+            # Truncate to mappable keys
+            key_count = max_mappable_keys
+        remaining_leds = available_leds - (key_count * leds_per_key)
     
     mapping = {}
-    led_index = 0
+    led_index = mapping_base_offset
     
     for key_num in range(key_count):
         midi_note = specs["midi_start"] + key_num
         
-        # Distribute remaining LEDs among first keys
-        key_led_count = leds_per_key + (1 if key_num < remaining_leds else 0)
+        # Distribute remaining LEDs among first keys (only when leds_per_key is calculated)
+        if leds_per_key is None or remaining_leds > 0:
+            key_led_count = leds_per_key + (1 if key_num < remaining_leds else 0)
+        else:
+            key_led_count = leds_per_key
         
         # Create LED range for this key
         led_range = list(range(led_index, led_index + key_led_count))

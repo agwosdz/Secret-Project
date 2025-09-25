@@ -10,6 +10,8 @@
 	let draggedLed = null;
 	let mappingMode = settings.mapping_mode || 'auto';
 	let keyOffset = settings.key_offset || 0;
+	let ledsPerKey = settings.leds_per_key || 3;
+	let mappingBaseOffset = settings.mapping_base_offset || 0;
 	let showAdvanced = false;
 
 	// Piano key data
@@ -39,7 +41,7 @@
 						midi: midiNote,
 						note: `${note}${octave}`,
 						type: 'white',
-						ledIndex: keyMapping[midiNote] || null
+						ledIndices: keyMapping[midiNote] || []
 					});
 				}
 			}
@@ -53,7 +55,7 @@
 						midi: midiNote,
 						note: `${note}${octave}`,
 						type: 'black',
-						ledIndex: keyMapping[midiNote] || null
+						ledIndices: keyMapping[midiNote] || []
 					});
 				}
 			}
@@ -79,8 +81,9 @@
 	}
 
 	function findKeyForLED(ledIndex) {
-		for (const [midi, led] of Object.entries(keyMapping)) {
-			if (led === ledIndex) {
+		for (const [midi, ledIndices] of Object.entries(keyMapping)) {
+			const indices = Array.isArray(ledIndices) ? ledIndices : [ledIndices];
+			if (indices.includes(ledIndex)) {
 				return parseInt(midi);
 			}
 		}
@@ -101,13 +104,53 @@
 		const whiteKeys = pianoKeys.filter(k => k.type === 'white');
 		const ledCount = settings.led_count || 246;
 		
-		// Simple linear mapping for white keys
-		whiteKeys.forEach((key, index) => {
-			const ledIndex = Math.floor((index + keyOffset) * (ledCount / whiteKeys.length));
-			if (ledIndex >= 0 && ledIndex < ledCount) {
-				newMapping[key.midi] = ledIndex;
-			}
-		});
+		if (mappingMode === 'auto') {
+			// Auto linear mapping with multi-LED support
+			whiteKeys.forEach((key, index) => {
+				const baseIndex = mappingBaseOffset + (index * ledsPerKey);
+				if (ledsPerKey > 1) {
+					const ledIndices = [];
+					for (let i = 0; i < ledsPerKey; i++) {
+						const ledIndex = baseIndex + i;
+						if (ledIndex < ledCount) {
+							ledIndices.push(ledIndex);
+						}
+					}
+					if (ledIndices.length > 0) {
+						newMapping[key.midi] = ledIndices;
+					}
+				} else {
+					if (baseIndex < ledCount) {
+						newMapping[key.midi] = baseIndex;
+					}
+				}
+			});
+		} else if (mappingMode === 'proportional') {
+			// Proportional mapping with multi-LED support
+			const totalKeys = whiteKeys.length;
+			const availableLeds = ledCount - mappingBaseOffset;
+			const ledsPerKeyFloat = availableLeds / totalKeys;
+			
+			whiteKeys.forEach((key, index) => {
+				const baseIndex = mappingBaseOffset + Math.floor(index * ledsPerKeyFloat);
+				if (ledsPerKey > 1) {
+					const ledIndices = [];
+					for (let i = 0; i < ledsPerKey; i++) {
+						const ledIndex = baseIndex + i;
+						if (ledIndex < ledCount) {
+							ledIndices.push(ledIndex);
+						}
+					}
+					if (ledIndices.length > 0) {
+						newMapping[key.midi] = ledIndices;
+					}
+				} else {
+					if (baseIndex < ledCount) {
+						newMapping[key.midi] = baseIndex;
+					}
+				}
+			});
+		}
 		
 		updateMapping(newMapping);
 	}
@@ -121,7 +164,9 @@
 			...settings,
 			key_mapping: newMapping,
 			mapping_mode: mappingMode,
-			key_offset: keyOffset
+			key_offset: keyOffset,
+			leds_per_key: ledsPerKey,
+			mapping_base_offset: mappingBaseOffset
 		};
 		
 		dispatch('change', updatedSettings);
@@ -154,8 +199,25 @@
 				}
 			}
 			
-			// Add new mapping
-			newMapping[targetKey.midi] = draggedLed.index;
+			// For multi-LED mapping, add to existing array or create new array
+			if (ledsPerKey > 1) {
+				if (!newMapping[targetKey.midi]) {
+					newMapping[targetKey.midi] = [];
+				}
+				if (!Array.isArray(newMapping[targetKey.midi])) {
+					newMapping[targetKey.midi] = [newMapping[targetKey.midi]];
+				}
+				if (!newMapping[targetKey.midi].includes(draggedLed.index)) {
+					newMapping[targetKey.midi].push(draggedLed.index);
+					// Limit to ledsPerKey
+					if (newMapping[targetKey.midi].length > ledsPerKey) {
+						newMapping[targetKey.midi] = newMapping[targetKey.midi].slice(-ledsPerKey);
+					}
+				}
+			} else {
+				// Single LED mapping
+				newMapping[targetKey.midi] = draggedLed.index;
+			}
 			updateMapping(newMapping);
 		}
 		
@@ -195,9 +257,11 @@
 	}
 
 	function removeKeyMapping(key) {
-		const newMapping = { ...keyMapping };
-		delete newMapping[key.midi];
-		updateMapping(newMapping);
+		if (keyMapping[key.note]) {
+			delete keyMapping[key.note];
+			keyMapping = { ...keyMapping };
+			updateMapping();
+		}
 	}
 </script>
 
@@ -214,7 +278,7 @@
 
 	{#if showAdvanced}
 		<div class="bg-gray-50 p-4 rounded-lg space-y-4">
-			<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 				<div>
 					<label for="mapping_mode" class="block text-sm font-medium text-gray-700 mb-2">
 						Mapping Mode
@@ -232,6 +296,36 @@
 				</div>
 
 				<div>
+					<label for="leds_per_key" class="block text-sm font-medium text-gray-700 mb-2">
+						LEDs per Key
+					</label>
+					<input
+						id="leds_per_key"
+						type="number"
+						min="1"
+						max="10"
+						bind:value={ledsPerKey}
+						on:input={() => updateMapping(keyMapping)}
+						class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+					/>
+				</div>
+
+				<div>
+					<label for="mapping_base_offset" class="block text-sm font-medium text-gray-700 mb-2">
+						Base Offset
+					</label>
+					<input
+						id="mapping_base_offset"
+						type="number"
+						min="0"
+						max="100"
+						bind:value={mappingBaseOffset}
+						on:input={() => updateMapping(keyMapping)}
+						class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+					/>
+				</div>
+
+				<div>
 					<label for="key_offset" class="block text-sm font-medium text-gray-700 mb-2">
 						Key Offset
 					</label>
@@ -246,7 +340,7 @@
 					/>
 				</div>
 
-				<div class="flex items-end space-x-2">
+				<div class="flex items-end space-x-2 md:col-span-2">
 					<button
 						on:click={generateAutoMapping}
 						class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -283,8 +377,16 @@
 								<span class="text-xs text-gray-500">MIDI {key.midi}</span>
 							</div>
 							<div class="flex items-center space-x-2">
-								{#if key.ledIndex !== null}
-									<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">LED {key.ledIndex}</span>
+								{#if key.ledIndices && key.ledIndices.length > 0}
+									{#if Array.isArray(key.ledIndices)}
+										<div class="flex flex-wrap gap-1">
+											{#each key.ledIndices as ledIndex}
+												<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">LED {ledIndex}</span>
+											{/each}
+										</div>
+									{:else}
+										<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">LED {key.ledIndices}</span>
+									{/if}
 									<button
 										on:click={() => removeKeyMapping(key)}
 										class="text-red-600 hover:text-red-800 text-xs"

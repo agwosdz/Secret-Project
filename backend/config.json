@@ -1,8 +1,19 @@
 {
     "led_count": 247,
     "max_led_count": 300,
-    "brightness": 0.8,
-    "gpio_pin": 18,
+    "brightness": 0.7,
+    "gpio_pin": 19,
     "size": "88-key",
-    "led_orientation": "normal"
+    "led_type": "WS2812B",
+    "led_orientation": "normal",
+    "power_supply_voltage": 4.4,
+    "gpio_power_pin": null,
+    "gpio_ground_pin": null,
+    "signal_level": 5,
+    "led_frequency": 800000,
+    "led_dma": 10,
+    "led_channel": 0,
+    "led_invert": false,
+    "leds_per_key": 3,
+    "mapping_base_offset": 0
 }

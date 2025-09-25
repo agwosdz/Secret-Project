@@ -13,6 +13,8 @@ import ConfigurationManager from '$lib/components/ConfigurationManager.svelte';
 		key_mapping: {},
 		mapping_mode: 'auto',
 		key_offset: 0,
+		leds_per_key: 3,
+		mapping_base_offset: 0,
 		
 		// GPIO configuration
 		gpio_pin: 18,
