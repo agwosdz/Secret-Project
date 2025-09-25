@@ -4,7 +4,7 @@ Flask-SocketIO==5.3.6
 pytest==7.4.4
 pytest-flask==1.2.0
 Werkzeug==2.3.7
-rpi_ws281x==4.3.4
-RPi.GPIO==0.7.1
+rpi_ws281x==4.3.4; sys_platform == "linux"
+RPi.GPIO==0.7.1; sys_platform == "linux"
 mido==1.3.2
 pymidi==0.5.0

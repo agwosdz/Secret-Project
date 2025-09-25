@@ -37,6 +37,12 @@ DEFAULT_CONFIG = {
     "leds_per_key": 3,  # Number of LEDs to light up per key
     "mapping_base_offset": 0,  # Base offset for the entire mapping
     
+    # Physical LED strip positioning parameters
+    "leds_per_meter": 60,  # Physical LED density (LEDs per meter)
+    "strip_length": 4.1,  # Physical strip length in meters (246 LEDs / 60 LEDs/m = 4.1m)
+    "note_offsets": {},  # Note-specific offsets {note: offset_value}
+    "global_shift": 0,  # Global shift applied to all note positions
+    
     # Advanced timing and performance settings
     "led_frequency": 800000,  # LED strip frequency (Hz)
     "led_dma": 10,  # DMA channel for LED control
@@ -250,51 +256,111 @@ def validate_config(config):
 
 def validate_config_comprehensive(config):
     """Comprehensive configuration validation with cross-field checks"""
-    errors = validate_config(config)
+    # Normalize incoming configurations to support older/different shapes used by some callers/tests
+    def _normalize_config_for_validation(input_config):
+        normalized = dict(input_config) if isinstance(input_config, dict) else {}
+        # Normalize brightness from 0-255 scale to 0.0-1.0 if needed
+        b = normalized.get('brightness')
+        if isinstance(b, (int, float)) and b > 1.0:
+            try:
+                if b <= 255:
+                    normalized['brightness'] = round(float(b) / 255.0, 3)
+            except Exception:
+                pass
+        # Normalize piano_size numeric to string form like "88-key"
+        ps = normalized.get('piano_size')
+        if isinstance(ps, int):
+            normalized['piano_size'] = f"{ps}-key"
+        # Map nested power_supply to flat keys
+        if isinstance(normalized.get('power_supply'), dict):
+            psup = normalized['power_supply']
+            if 'voltage' in psup:
+                normalized['power_supply_voltage'] = psup['voltage']
+            if 'max_current' in psup:
+                normalized['power_supply_current'] = psup['max_current']
+        # Map nested gpio_pins to flat primary data pin
+        if isinstance(normalized.get('gpio_pins'), dict):
+            gp = normalized['gpio_pins']
+            if gp.get('data_pin') is not None:
+                normalized['gpio_pin'] = gp.get('data_pin')
+        # Normalize orientation synonyms
+        lo = normalized.get('led_orientation')
+        if lo == 'bottom_up':
+            normalized['led_orientation'] = 'reversed'
+        elif lo == 'top_down':
+            normalized['led_orientation'] = 'normal'
+        # Normalize signal_level string like '3.3V' -> 3.3
+        sl = normalized.get('signal_level')
+        if isinstance(sl, str) and sl.strip().lower().endswith('v'):
+            try:
+                normalized['signal_level'] = float(sl.strip().lower().replace('v', ''))
+            except Exception:
+                pass
+        # Map unknown mapping_mode values to supported ones
+        mm = normalized.get('mapping_mode')
+        if mm == 'linear':
+            normalized['mapping_mode'] = 'auto'
+        return normalized
+
+    normalized = _normalize_config_for_validation(config)
+
+    errors = validate_config(normalized)
     warnings = []
     
     # Cross-validation: Power consumption vs supply capacity
-    if all(key in config for key in ["led_count", "brightness", "led_type", "power_supply_current"]):
+    if all(key in normalized for key in ["led_count", "brightness", "led_type", "power_supply_current", "power_supply_voltage"]):
         power_consumption = calculate_led_power_consumption(
-            config["led_count"], 
-            config["brightness"], 
-            config["led_type"]
+            normalized["led_count"], 
+            normalized["brightness"], 
+            normalized["led_type"]
         )
-        max_power = config["power_supply_voltage"] * config["power_supply_current"]
+        max_power = normalized["power_supply_voltage"] * normalized["power_supply_current"]
         
-        if power_consumption["total_watts"] > max_power:
+        if power_consumption.get("total_watts", 0) > max_power:
             errors.append(
-                f"Power consumption ({power_consumption['total_watts']:.1f}W) exceeds "
+                f"Power consumption ({power_consumption.get('total_watts', 0):.1f}W) exceeds "
                 f"power supply capacity ({max_power:.1f}W)"
             )
-        elif power_consumption["total_watts"] > max_power * 0.8:
+        elif power_consumption.get("total_watts", 0) > max_power * 0.8:
             warnings.append(
-                f"Power consumption ({power_consumption['total_watts']:.1f}W) is close to "
+                f"Power consumption ({power_consumption.get('total_watts', 0):.1f}W) is close to "
                 f"power supply capacity ({max_power:.1f}W). Consider reducing brightness or LED count."
             )
     
-    # Cross-validation: GPIO pin conflicts
-    gpio_pins = []
+    # Cross-validation: GPIO pin conflicts (support both flat and nested gpio_pins)
+    gpio_pins_seen = []
+
+    def _add_pin(pin_val):
+        if pin_val is None:
+            return
+        if pin_val in gpio_pins_seen:
+            errors.append(f"GPIO pin {pin_val} is used multiple times")
+        gpio_pins_seen.append(pin_val)
+
+    # Flat pins
     for pin_key in ["gpio_pin", "gpio_power_pin", "gpio_ground_pin"]:
-        if pin_key in config and config[pin_key] is not None:
-            pin = config[pin_key]
-            if pin in gpio_pins:
-                errors.append(f"GPIO pin {pin} is used multiple times")
-            gpio_pins.append(pin)
+        _add_pin(normalized.get(pin_key))
+
+    # Nested pins
+    gp = normalized.get('gpio_pins')
+    if isinstance(gp, dict):
+        for nested_key in ["data_pin", "clock_pin", "power_pin", "ground_pin"]:
+            _add_pin(gp.get(nested_key))
     
     # Cross-validation: Piano size vs LED count consistency
-    if "piano_size" in config and "led_count" in config and config["piano_size"] != "custom":
-        piano_specs = get_piano_specs(config["piano_size"])
+    if "piano_size" in normalized and "led_count" in normalized and normalized["piano_size"] != "custom":
+        piano_specs = get_piano_specs(normalized["piano_size"])
         recommended_leds = piano_specs["keys"] * 3  # Rough estimate
         
-        if abs(config["led_count"] - recommended_leds) > recommended_leds * 0.5:
+        if piano_specs["keys"] > 0 and abs(normalized["led_count"] - recommended_leds) > max(recommended_leds * 0.5, 1):
             warnings.append(
-                f"LED count ({config['led_count']}) seems inconsistent with piano size "
-                f"({config['piano_size']}). Recommended: ~{recommended_leds} LEDs"
+                f"LED count ({normalized['led_count']}) seems inconsistent with piano size "
+                f"({normalized['piano_size']}). Recommended: ~{recommended_leds} LEDs"
             )
     
     return {
         "valid": len(errors) == 0,
+        "is_valid": len(errors) == 0,  # alias for compatibility with some tests/clients
         "errors": errors,
         "warnings": warnings
     }
@@ -434,11 +500,13 @@ def calculate_led_power_consumption(led_count, brightness=1.0, led_type="WS2812B
     
     power_per_led = led_power_specs.get(led_type, 60)
     total_current = (led_count * power_per_led * brightness) / 1000  # Convert to Amps
+    total_watts_5v = round(total_current * 5.0, 2)
     
     return {
         "current_amps": round(total_current, 2),
         "current_ma": round(total_current * 1000),
-        "power_5v_watts": round(total_current * 5.0, 2),
+        "power_5v_watts": total_watts_5v,
+        "total_watts": total_watts_5v,  # alias for compatibility
         "recommended_supply_amps": round(total_current * 1.2, 2)  # 20% safety margin
     }
 
@@ -512,6 +580,111 @@ def generate_auto_key_mapping(piano_size, led_count, led_orientation="normal", l
         for midi_note, led_list in mapping.items():
             reversed_mapping[midi_note] = [total_leds - led for led in led_list]
         mapping = reversed_mapping
+    
+    return mapping
+
+
+def calculate_note_position(note, leds_per_meter, strip_length, note_offsets=None, global_shift=0, led_count=None, led_orientation="normal", debug=False, piano_size="88-key"):
+    """
+    Calculate LED position for a MIDI note using physical strip parameters and offsets.
+    
+    Args:
+        note: MIDI note number (0-127)
+        leds_per_meter: Total number of LEDs available for mapping
+        strip_length: Physical strip length in meters (kept for compatibility)
+        note_offsets: Dictionary of note-specific offsets {note: offset_value}
+        global_shift: Global shift applied to all note positions
+        led_count: Total number of LEDs (uses leds_per_meter if not provided)
+        led_orientation: LED orientation ("normal" or "reversed")
+        debug: Print debug information
+        piano_size: Piano size to determine number of keys (default "88-key")
+    
+    Returns:
+        int: LED position (0-based) or None if outside valid range
+    """
+    if note_offsets is None:
+        note_offsets = {}
+    
+    # Determine number of keys based on piano size
+    if piano_size == "88-key":
+        num_keys = 88
+    elif piano_size == "76-key":
+        num_keys = 76
+    elif piano_size == "61-key":
+        num_keys = 61
+    else:
+        num_keys = 88  # default
+    
+    # Step 1: Process all offsets first
+    # Load all offsets, and if note > offset set noteoffset to that shift
+    note_offset = 0
+    for offset_note, shift_value in note_offsets.items():
+        if note > offset_note:
+            note_offset = shift_value
+    
+    # Step 2: Process the global shift by incrementing/decrementing the note offset by shift
+    note_offset += global_shift
+    
+    # Step 3: Get the strip density as leds_per_meter / number_of_keys
+    strip_density = leds_per_meter / num_keys
+    
+    # Step 4: Calculate the note position as int(density * (note - 20) - note_offset)
+    # Account for first MIDI note being 21
+    note_position = int(strip_density * (note - 20) - note_offset)
+    
+    # Step 5: Apply orientation and bounds checking
+    if led_count is None:
+        led_count = leds_per_meter
+    
+    if debug:
+        print(f"Note {note}: density={strip_density:.2f} (LEDs={leds_per_meter}/keys={num_keys}), raw_pos={note_position}, offset={note_offset}")
+    
+    if led_orientation == "normal":
+        final_position = max(0, note_position)
+    else:  # reversed
+        final_position = max(0, led_count - 1 - note_position)  # Fix: subtract 1 for 0-based indexing
+    
+    # Ensure position is within LED strip bounds
+    if final_position >= led_count:
+        if debug:
+            print(f"  Position {final_position} >= {led_count}, returning None")
+        return None
+    
+    return final_position
+
+
+def generate_density_based_mapping(piano_size, leds_per_meter, strip_length, note_offsets=None, global_shift=0, led_orientation="normal"):
+    """
+    Generate note-to-LED mapping using the density-based positioning algorithm.
+    
+    Args:
+        piano_size: Piano size (e.g., "88-key")
+        leds_per_meter: Physical LED density (LEDs per meter)
+        strip_length: Physical strip length in meters
+        note_offsets: Dictionary of note-specific offsets {note: offset_value}
+        global_shift: Global shift applied to all note positions
+        led_orientation: LED orientation ("normal" or "reversed")
+    
+    Returns:
+        dict: Mapping of MIDI note to LED index
+    """
+    specs = get_piano_specs(piano_size)
+    led_count = int(leds_per_meter * strip_length)
+    mapping = {}
+    
+    for note in range(specs["midi_start"], specs["midi_end"] + 1):
+        led_position = calculate_note_position(
+            note=note,
+            leds_per_meter=leds_per_meter,
+            strip_length=strip_length,
+            note_offsets=note_offsets,
+            global_shift=global_shift,
+            led_count=led_count,
+            led_orientation=led_orientation
+        )
+        
+        if led_position is not None:
+            mapping[note] = led_position
     
     return mapping
 
