@@ -73,6 +73,10 @@ usb_midi_service = USBMIDIInputService(led_controller=led_controller, websocket_
 playback_service = PlaybackService(led_controller=led_controller, midi_parser=midi_parser) if PlaybackService and midi_parser else None
 midi_input_manager = MIDIInputManager(websocket_callback=socketio.emit, led_controller=led_controller) if MIDIInputManager else None
 
+# Initialize MIDI input manager services
+if midi_input_manager:
+    midi_input_manager.initialize_services()
+
 @app.route('/api/playback', methods=['POST'])
 def start_playback():
     """Start playback"""
