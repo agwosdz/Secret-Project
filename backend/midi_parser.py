@@ -263,3 +263,6 @@ class MIDIParser:
         except Exception as e:
             logger.warning(f"MIDI validation failed for {file_path}: {str(e)}")
             return False
+
+# Create default instance for import
+midi_parser = MIDIParser()

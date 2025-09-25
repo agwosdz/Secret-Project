@@ -38,6 +38,10 @@ try:
     from usb_midi_service import UsbMidiService
 except Exception:
     UsbMidiService = None
+try:
+    from playback_service import PlaybackService
+except Exception:
+    PlaybackService = None
 
 def websocket_status_callback(status):
     """Broadcast playback status over WebSocket."""
@@ -61,9 +65,12 @@ def websocket_status_callback(status):
 
 LED_COUNT = 246
 
+# Initialize LED controller first
+led_controller = LEDController(num_pixels=LED_COUNT)
+
+# Initialize services that depend on LED controller
 usb_midi_service = UsbMidiService(midi_parser=midi_parser) if UsbMidiService and midi_parser else None
-playback_service = None
-led_controller = None
+playback_service = PlaybackService(led_controller=led_controller, midi_parser=midi_parser) if PlaybackService and midi_parser else None
 midi_input_manager = MIDIInputManager(websocket_callback=socketio.emit, led_controller=led_controller) if MIDIInputManager else None
 
 @app.route('/api/playback', methods=['POST'])
