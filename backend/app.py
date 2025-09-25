@@ -35,9 +35,9 @@ try:
 except Exception:
     MIDIInputManager = None
 try:
-    from usb_midi_service import UsbMidiService
+    from usb_midi_service import USBMIDIInputService
 except Exception:
-    UsbMidiService = None
+    USBMIDIInputService = None
 try:
     from playback_service import PlaybackService
 except Exception:
@@ -69,7 +69,7 @@ LED_COUNT = 246
 led_controller = LEDController(num_pixels=LED_COUNT)
 
 # Initialize services that depend on LED controller
-usb_midi_service = UsbMidiService(midi_parser=midi_parser) if UsbMidiService and midi_parser else None
+usb_midi_service = USBMIDIInputService(led_controller=led_controller, websocket_callback=socketio.emit) if USBMIDIInputService else None
 playback_service = PlaybackService(led_controller=led_controller, midi_parser=midi_parser) if PlaybackService and midi_parser else None
 midi_input_manager = MIDIInputManager(websocket_callback=socketio.emit, led_controller=led_controller) if MIDIInputManager else None
 
