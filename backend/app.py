@@ -31,9 +31,9 @@ try:
 except Exception:
     midi_parser = None
 try:
-    from midi_input_manager import MidiInputManager
+    from midi_input_manager import MIDIInputManager
 except Exception:
-    MidiInputManager = None
+    MIDIInputManager = None
 try:
     from usb_midi_service import UsbMidiService
 except Exception:
@@ -62,9 +62,9 @@ def websocket_status_callback(status):
 LED_COUNT = 246
 
 usb_midi_service = UsbMidiService(midi_parser=midi_parser) if UsbMidiService and midi_parser else None
-midi_input_manager = MidiInputManager(midi_parser=midi_parser) if MidiInputManager and midi_parser else None
 playback_service = None
 led_controller = None
+midi_input_manager = MIDIInputManager(websocket_callback=socketio.emit, led_controller=led_controller) if MIDIInputManager else None
 
 @app.route('/api/playback', methods=['POST'])
 def start_playback():
