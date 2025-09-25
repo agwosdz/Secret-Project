@@ -37,12 +37,6 @@ DEFAULT_CONFIG = {
     "leds_per_key": 3,  # Number of LEDs to light up per key
     "mapping_base_offset": 0,  # Base offset for the entire mapping
     
-    # Physical LED strip positioning parameters
-    "leds_per_meter": 60,  # Physical LED density (LEDs per meter)
-    "strip_length": 4.1,  # Physical strip length in meters (246 LEDs / 60 LEDs/m = 4.1m)
-    "note_offsets": {},  # Note-specific offsets {note: offset_value}
-    "global_shift": 0,  # Global shift applied to all note positions
-    
     # Advanced timing and performance settings
     "led_frequency": 800000,  # LED strip frequency (Hz)
     "led_dma": 10,  # DMA channel for LED control
@@ -580,111 +574,6 @@ def generate_auto_key_mapping(piano_size, led_count, led_orientation="normal", l
         for midi_note, led_list in mapping.items():
             reversed_mapping[midi_note] = [total_leds - led for led in led_list]
         mapping = reversed_mapping
-    
-    return mapping
-
-
-def calculate_note_position(note, leds_per_meter, strip_length, note_offsets=None, global_shift=0, led_count=None, led_orientation="normal", debug=False, piano_size="88-key"):
-    """
-    Calculate LED position for a MIDI note using physical strip parameters and offsets.
-    
-    Args:
-        note: MIDI note number (0-127)
-        leds_per_meter: Total number of LEDs available for mapping
-        strip_length: Physical strip length in meters (kept for compatibility)
-        note_offsets: Dictionary of note-specific offsets {note: offset_value}
-        global_shift: Global shift applied to all note positions
-        led_count: Total number of LEDs (uses leds_per_meter if not provided)
-        led_orientation: LED orientation ("normal" or "reversed")
-        debug: Print debug information
-        piano_size: Piano size to determine number of keys (default "88-key")
-    
-    Returns:
-        int: LED position (0-based) or None if outside valid range
-    """
-    if note_offsets is None:
-        note_offsets = {}
-    
-    # Determine number of keys based on piano size
-    if piano_size == "88-key":
-        num_keys = 88
-    elif piano_size == "76-key":
-        num_keys = 76
-    elif piano_size == "61-key":
-        num_keys = 61
-    else:
-        num_keys = 88  # default
-    
-    # Step 1: Process all offsets first
-    # Load all offsets, and if note > offset set noteoffset to that shift
-    note_offset = 0
-    for offset_note, shift_value in note_offsets.items():
-        if note > offset_note:
-            note_offset = shift_value
-    
-    # Step 2: Process the global shift by incrementing/decrementing the note offset by shift
-    note_offset += global_shift
-    
-    # Step 3: Get the strip density as leds_per_meter / number_of_keys
-    strip_density = leds_per_meter / num_keys
-    
-    # Step 4: Calculate the note position as int(density * (note - 20) - note_offset)
-    # Account for first MIDI note being 21
-    note_position = int(strip_density * (note - 20) - note_offset)
-    
-    # Step 5: Apply orientation and bounds checking
-    if led_count is None:
-        led_count = leds_per_meter
-    
-    if debug:
-        print(f"Note {note}: density={strip_density:.2f} (LEDs={leds_per_meter}/keys={num_keys}), raw_pos={note_position}, offset={note_offset}")
-    
-    if led_orientation == "normal":
-        final_position = max(0, note_position)
-    else:  # reversed
-        final_position = max(0, led_count - 1 - note_position)  # Fix: subtract 1 for 0-based indexing
-    
-    # Ensure position is within LED strip bounds
-    if final_position >= led_count:
-        if debug:
-            print(f"  Position {final_position} >= {led_count}, returning None")
-        return None
-    
-    return final_position
-
-
-def generate_density_based_mapping(piano_size, leds_per_meter, strip_length, note_offsets=None, global_shift=0, led_orientation="normal"):
-    """
-    Generate note-to-LED mapping using the density-based positioning algorithm.
-    
-    Args:
-        piano_size: Piano size (e.g., "88-key")
-        leds_per_meter: Physical LED density (LEDs per meter)
-        strip_length: Physical strip length in meters
-        note_offsets: Dictionary of note-specific offsets {note: offset_value}
-        global_shift: Global shift applied to all note positions
-        led_orientation: LED orientation ("normal" or "reversed")
-    
-    Returns:
-        dict: Mapping of MIDI note to LED index
-    """
-    specs = get_piano_specs(piano_size)
-    led_count = int(leds_per_meter * strip_length)
-    mapping = {}
-    
-    for note in range(specs["midi_start"], specs["midi_end"] + 1):
-        led_position = calculate_note_position(
-            note=note,
-            leds_per_meter=leds_per_meter,
-            strip_length=strip_length,
-            note_offsets=note_offsets,
-            global_shift=global_shift,
-            led_count=led_count,
-            led_orientation=led_orientation
-        )
-        
-        if led_position is not None:
-            mapping[note] = led_position
     
     return mapping
 
