@@ -74,7 +74,8 @@ class USBMIDIInputService:
         # Load configuration
         self.piano_size = get_config('piano_size', '88-key')
         piano_specs = get_piano_specs(self.piano_size)
-        self.num_leds = piano_specs['keys']
+        # Use actual LED count from configuration, not piano key count
+        self.num_leds = get_config('led_count', 246)
         self.min_midi_note = piano_specs['midi_start']
         self.max_midi_note = piano_specs['midi_end']
         self.led_orientation = get_config('led_orientation', 'normal')
