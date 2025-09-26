@@ -4,13 +4,13 @@
 	const dispatch = createEventDispatcher();
 
 	export let settings = {
-		led_count: 246,
-		max_led_count: 300,
-		led_type: 'WS2812B',
-		led_orientation: 'normal',
-		led_strip_type: 'WS2811_STRIP_GRB',
-		power_supply_voltage: 5.0,
-		power_supply_current: 10.0,
+		ledCount: 246,
+		maxLedCount: 300,
+		ledType: 'WS2812B',
+		ledOrientation: 'normal',
+		ledStripType: 'WS2811_STRIP_GRB',
+		powerSupplyVoltage: 5.0,
+		powerSupplyCurrent: 10.0,
 		brightness: 0.5
 	};
 	export let disabled = false;
@@ -78,17 +78,17 @@
 	let validationErrors = {};
 
 	function calculatePower() {
-		const selectedType = ledTypes.find(type => type.value === settings.led_type);
+		const selectedType = ledTypes.find(type => type.value === settings.ledType);
 		if (!selectedType) return;
 
-		const totalCurrentMa = settings.led_count * selectedType.current_per_led * settings.brightness;
+		const totalCurrentMa = settings.ledCount * selectedType.current_per_led * settings.brightness;
 		const totalCurrentA = totalCurrentMa / 1000;
 		const totalWatts = totalCurrentA * selectedType.voltage;
 		const recommendedSupplyA = totalCurrentA * 1.2; // 20% safety margin
 		const recommendedSupplyW = recommendedSupplyA * selectedType.voltage;
 
 		// Voltage drop calculation (approximate)
-		const stripLengthM = settings.led_count * 0.0167; // Assume 60 LEDs/meter
+		const stripLengthM = settings.ledCount * 0.0167; // Assume 60 LEDs/meter
 		const voltageDrop = (totalCurrentA * stripLengthM * 0.1); // Rough estimate
 		const effectiveVoltage = selectedType.voltage - voltageDrop;
 
@@ -101,7 +101,7 @@
 			strip_length_m: Math.round(stripLengthM * 100) / 100,
 			voltage_drop: Math.round(voltageDrop * 100) / 100,
 			effective_voltage: Math.round(effectiveVoltage * 100) / 100,
-			supply_adequate: settings.power_supply_current >= recommendedSupplyA,
+			supply_adequate: settings.powerSupplyCurrent >= recommendedSupplyA,
 			voltage_adequate: effectiveVoltage >= (selectedType.voltage * 0.9)
 		};
 	}
@@ -109,24 +109,24 @@
 	function validateConfig() {
 		const errors = {};
 
-		if (settings.led_count <= 0) {
-			errors.led_count = 'LED count must be greater than 0';
+		if (settings.ledCount <= 0) {
+			errors.ledCount = 'LED count must be greater than 0';
 		}
 
-		if (settings.led_count > settings.max_led_count) {
-			errors.led_count = `LED count cannot exceed ${settings.max_led_count}`;
+		if (settings.ledCount > settings.maxLedCount) {
+			errors.ledCount = `LED count cannot exceed ${settings.maxLedCount}`;
 		}
 
 		if (settings.brightness < 0 || settings.brightness > 1) {
 			errors.brightness = 'Brightness must be between 0 and 1';
 		}
 
-		if (settings.power_supply_voltage < 3 || settings.power_supply_voltage > 24) {
-			errors.power_supply_voltage = 'Voltage must be between 3V and 24V';
+		if (settings.powerSupplyVoltage < 3 || settings.powerSupplyVoltage > 24) {
+			errors.powerSupplyVoltage = 'Voltage must be between 3V and 24V';
 		}
 
-		if (settings.power_supply_current < 0.5 || settings.power_supply_current > 100) {
-			errors.power_supply_current = 'Current must be between 0.5A and 100A';
+		if (settings.powerSupplyCurrent < 0.5 || settings.powerSupplyCurrent > 100) {
+			errors.powerSupplyCurrent = 'Current must be between 0.5A and 100A';
 		}
 
 		validationErrors = errors;
@@ -136,10 +136,10 @@
 		settings = { ...settings, [key]: value };
 		
 		// Auto-update strip type when LED type changes
-		if (key === 'led_type') {
+		if (key === 'ledType') {
 			const selectedType = ledTypes.find(type => type.value === value);
 			if (selectedType) {
-				settings.led_strip_type = colorOrders[selectedType.color_order];
+				settings.ledStripType = colorOrders[selectedType.color_order];
 			}
 		}
 		
@@ -150,7 +150,7 @@
 
 	function handleLEDCountInput(event) {
 		const value = parseInt(event.target.value) || 0;
-		handleConfigChange('led_count', Math.min(value, settings.max_led_count));
+		handleConfigChange('ledCount', Math.min(value, settings.maxLedCount));
 	}
 
 	// Initialize calculations
@@ -159,7 +159,7 @@
 		validateConfig();
 	}
 
-	$: selectedLEDType = ledTypes.find(type => type.value === settings.led_type);
+	$: selectedLEDType = ledTypes.find(type => type.value === settings.ledType);
 	$: hasErrors = Object.keys(validationErrors).length > 0;
 	$: powerWarnings = powerCalculation.supply_adequate === false || powerCalculation.voltage_adequate === false;
 </script>
@@ -173,8 +173,8 @@
 				<label for="led-type">LED Strip Type</label>
 				<select
 					id="led-type"
-					bind:value={settings.led_type}
-					on:change={(e) => handleConfigChange('led_type', e.target.value)}
+					bind:value={settings.ledType}
+				on:change={(e) => handleConfigChange('ledType', e.target.value)}
 					{disabled}
 				>
 					{#each ledTypes as type}
@@ -197,16 +197,16 @@
 						id="led-count"
 						type="number"
 						min="1"
-						max={settings.max_led_count}
-						bind:value={settings.led_count}
-						on:input={handleLEDCountInput}
-						{disabled}
-						class:error={validationErrors.led_count}
-					/>
-					<span class="max-indicator">/ {settings.max_led_count} max</span>
-				</div>
-				{#if validationErrors.led_count}
-					<span class="error-message">{validationErrors.led_count}</span>
+						max={settings.maxLedCount}
+				bind:value={settings.ledCount}
+				on:input={handleLEDCountInput}
+				{disabled}
+				class:error={validationErrors.ledCount}
+			/>
+			<span class="max-indicator">/ {settings.maxLedCount} max</span>
+		</div>
+		{#if validationErrors.ledCount}
+			<span class="error-message">{validationErrors.ledCount}</span>
 				{/if}
 			</div>
 
@@ -214,8 +214,8 @@
 				<label for="led-orientation">LED Orientation</label>
 				<select
 					id="led-orientation"
-					bind:value={settings.led_orientation}
-					on:change={(e) => handleConfigChange('led_orientation', e.target.value)}
+					bind:value={settings.ledOrientation}
+				on:change={(e) => handleConfigChange('ledOrientation', e.target.value)}
 					{disabled}
 				>
 					<option value="normal">Normal (Left to Right)</option>
@@ -258,13 +258,13 @@
 					min="3"
 					max="24"
 					step="0.1"
-					bind:value={settings.power_supply_voltage}
-					on:input={(e) => handleConfigChange('power_supply_voltage', parseFloat(e.target.value))}
-					{disabled}
-					class:error={validationErrors.power_supply_voltage}
-				/>
-				{#if validationErrors.power_supply_voltage}
-					<span class="error-message">{validationErrors.power_supply_voltage}</span>
+					bind:value={settings.powerSupplyVoltage}
+				on:input={(e) => handleConfigChange('powerSupplyVoltage', parseFloat(e.target.value))}
+				{disabled}
+				class:error={validationErrors.powerSupplyVoltage}
+			/>
+			{#if validationErrors.powerSupplyVoltage}
+				<span class="error-message">{validationErrors.powerSupplyVoltage}</span>
 				{/if}
 			</div>
 
@@ -276,13 +276,13 @@
 					min="0.5"
 					max="100"
 					step="0.1"
-					bind:value={settings.power_supply_current}
-					on:input={(e) => handleConfigChange('power_supply_current', parseFloat(e.target.value))}
-					{disabled}
-					class:error={validationErrors.power_supply_current}
-				/>
-				{#if validationErrors.power_supply_current}
-					<span class="error-message">{validationErrors.power_supply_current}</span>
+					bind:value={settings.powerSupplyCurrent}
+				on:input={(e) => handleConfigChange('powerSupplyCurrent', parseFloat(e.target.value))}
+				{disabled}
+				class:error={validationErrors.powerSupplyCurrent}
+			/>
+			{#if validationErrors.powerSupplyCurrent}
+				<span class="error-message">{validationErrors.powerSupplyCurrent}</span>
 				{/if}
 			</div>
 		</div>

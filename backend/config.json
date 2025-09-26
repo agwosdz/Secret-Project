@@ -1,6 +1,6 @@
 {
     "brightness": 0.8,
-    "led_count": 245,
+    "led_count": 255,
     "gpio_pin": 19,
     "piano_size": "88-key",
     "led_orientation": "normal"

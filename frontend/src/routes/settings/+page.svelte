@@ -6,7 +6,8 @@
 	import GPIOConfigPanel from '$lib/components/GPIOConfigPanel.svelte';
 	import LEDStripConfig from '$lib/components/LEDStripConfig.svelte';
 	import LEDTestSequence from '$lib/components/LEDTestSequence.svelte';
-import ConfigurationManager from '$lib/components/ConfigurationManager.svelte';
+	import ConfigurationManager from '$lib/components/ConfigurationManager.svelte';
+	import DashboardControls from '$lib/components/DashboardControls.svelte';
 
 	// Component state
 	let message = '';
@@ -115,6 +116,18 @@ function handleSettingsChange(newSettings) {
 	updateSettings({ ...currentSettings, ...newSettings });
 }
 
+function handleLEDSettingsChange(newLEDSettings) {
+	// Map camelCase LED settings back to the backend format
+	const updatedSettings = {
+		...currentSettings,
+		led: {
+			...currentSettings.led,
+			...newLEDSettings
+		}
+	};
+	updateSettings(updatedSettings);
+}
+
 function showMessage(text, type) {
 	message = text;
 	messageType = type;
@@ -170,14 +183,41 @@ function showMessage(text, type) {
 				/>
 			{:else if activeTab === 'led'}
 				<LEDStripConfig 
-					bind:settings={currentSettings}
-					on:change={(e) => handleSettingsChange(e.detail)}
+					settings={{
+						ledCount: currentSettings.led?.ledCount || 246,
+						maxLedCount: currentSettings.led?.maxLedCount || 300,
+						ledType: currentSettings.led?.ledType || 'WS2812B',
+						ledOrientation: currentSettings.led?.ledOrientation || 'normal',
+						ledStripType: currentSettings.led?.ledStripType || 'WS2811_STRIP_GRB',
+						powerSupplyVoltage: currentSettings.led?.powerSupplyVoltage || 5.0,
+						powerSupplyCurrent: currentSettings.led?.powerSupplyCurrent || 10.0,
+						brightness: currentSettings.led?.brightness || 0.5
+					}}
+					on:change={(e) => handleLEDSettingsChange(e.detail)}
 				/>
 			{:else if activeTab === 'test'}
-				<LEDTestSequence 
-					bind:settings={currentSettings}
-					on:change={(e) => handleSettingsChange(e.detail)}
-				/>
+				<div class="led-test-container">
+					<LEDTestSequence 
+						bind:settings={currentSettings}
+						on:change={(e) => handleSettingsChange(e.detail)}
+					/>
+					
+					<!-- Manual LED Control Section -->
+					<div class="manual-control-section">
+						<h3 class="text-lg font-medium text-gray-900 mb-4">Manual LED Control</h3>
+						<p class="text-sm text-gray-600 mb-6">Test individual LEDs and patterns for troubleshooting and validation.</p>
+						
+						<div class="manual-controls-wrapper">
+							<DashboardControls 
+								connected={true}
+								ledCount={currentSettings.led?.ledCount || 246}
+								on:ledTest={(e) => console.log('LED Test:', e.detail)}
+								on:patternTest={(e) => console.log('Pattern Test:', e.detail)}
+								on:ledCountChange={(e) => console.log('LED Count Change:', e.detail)}
+							/>
+						</div>
+					</div>
+				</div>
 			{:else if activeTab === 'config'}
 				<ConfigurationManager 
 					bind:settings={currentSettings}
@@ -322,5 +362,40 @@ function showMessage(text, type) {
 </div>
 
 <style>
-	/* Additional custom styles if needed */
+	/* LED Test Container Styles */
+	.led-test-container {
+		display: flex;
+		flex-direction: column;
+		gap: 2rem;
+	}
+
+	.manual-control-section {
+		background: #f9fafb;
+		border: 1px solid #e5e7eb;
+		border-radius: 0.5rem;
+		padding: 1.5rem;
+		margin-top: 1rem;
+	}
+
+	.manual-controls-wrapper {
+		background: white;
+		border-radius: 0.375rem;
+		padding: 1rem;
+		box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+	}
+
+	/* Responsive adjustments */
+	@media (max-width: 768px) {
+		.led-test-container {
+			gap: 1rem;
+		}
+		
+		.manual-control-section {
+			padding: 1rem;
+		}
+		
+		.manual-controls-wrapper {
+			padding: 0.75rem;
+		}
+	}
 </style>

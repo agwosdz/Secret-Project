@@ -82,7 +82,7 @@
         body: JSON.stringify({
           type: selectedSequence,
           duration: testDuration,
-          led_count: ledCount
+          ledCount: ledCount
         })
       });
       
@@ -212,7 +212,7 @@
         </div>
         <div class="info-item">
           <span class="label">LED Count:</span>
-          <span class="value">{currentSequence.led_count}</span>
+          <span class="value">{currentSequence.ledCount}</span>
         </div>
       </div>
     </div>

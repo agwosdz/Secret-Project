@@ -3,8 +3,12 @@
 	import Navigation from '$lib/components/Navigation.svelte';
 	import ToastContainer from '$lib/components/ToastContainer.svelte';
 	import '$lib/styles/global.css';
+	import { page } from '$app/stores';
 
 	let { children } = $props();
+	
+	// Force page re-render when route changes to prevent content stacking
+	$: currentPath = $page.url.pathname;
 </script>
 
 <svelte:head>
@@ -14,7 +18,7 @@
 
 <div class="app-container">
 	<Navigation />
-	<main class="main-content">
+	<main class="main-content" key={currentPath}>
 		{@render children?.()}
 	</main>
 </div>

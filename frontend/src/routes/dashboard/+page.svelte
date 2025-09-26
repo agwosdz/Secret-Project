@@ -384,7 +384,7 @@
 	// Fetch saved LED count from backend settings
 	async function fetchLEDCount() {
 		try {
-			const count = await getSetting('led', 'led_count');
+			const count = await getSetting('led', 'ledCount');
 			if (count && count !== ledCount) {
 				ledCount = count;
 				initializeLEDState(ledCount);

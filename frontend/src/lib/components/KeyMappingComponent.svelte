@@ -65,7 +65,7 @@
 	}
 
 	function generateLEDStrip() {
-		const ledCount = settings.led_count || 246;
+		const ledCount = settings.ledCount || 246;
 		const leds = [];
 		
 		for (let i = 0; i < ledCount; i++) {
@@ -102,7 +102,7 @@
 	function generateAutoMapping() {
 		const newMapping = {};
 		const whiteKeys = pianoKeys.filter(k => k.type === 'white');
-		const ledCount = settings.led_count || 246;
+		const ledCount = settings.ledCount || 246;
 		
 		if (mappingMode === 'auto') {
 			// Auto linear mapping with multi-LED support
