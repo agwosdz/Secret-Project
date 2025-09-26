@@ -8,7 +8,7 @@
 	let { children } = $props();
 	
 	// Force page re-render when route changes to prevent content stacking
-	$: currentPath = $page.url.pathname;
+	let currentPath = $derived($page.url.pathname);
 </script>
 
 <svelte:head>
