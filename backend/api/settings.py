@@ -99,6 +99,7 @@ def set_setting(category, key):
         }), 500
 
 @settings_bp.route('/', methods=['PUT'])
+@settings_bp.route('/bulk', methods=['POST'])
 def update_multiple_settings():
     """Update multiple settings at once"""
     try:
