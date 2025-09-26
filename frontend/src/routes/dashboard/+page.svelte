@@ -1,5 +1,7 @@
 <script>
 	import { onMount, onDestroy } from 'svelte';
+	import { browser } from '$app/environment';
+	import { settings, getSetting } from '$lib/stores/settings.js';
 	import LEDVisualization from '$lib/components/LEDVisualization.svelte';
 	import DashboardControls from '$lib/components/DashboardControls.svelte';
 	import PerformanceMonitor from '$lib/components/PerformanceMonitor.svelte';
@@ -382,16 +384,11 @@
 	// Fetch saved LED count from backend settings
 	async function fetchLEDCount() {
 		try {
-			const response = await fetch('/api/settings/led_count');
-			if (response.ok) {
-				const data = await response.json();
-				if (data.led_count && data.led_count !== ledCount) {
-					ledCount = data.led_count;
-					initializeLEDState(ledCount);
-					console.log(`Retrieved LED count from settings: ${ledCount}`);
-				}
-			} else {
-				console.warn(`Failed to fetch LED count: ${response.status}`);
+			const count = await getSetting('led', 'led_count');
+			if (count && count !== ledCount) {
+				ledCount = count;
+				initializeLEDState(ledCount);
+				console.log(`Retrieved LED count from settings: ${ledCount}`);
 			}
 		} catch (error) {
 			console.warn(`Error fetching LED count: ${error.message}`);

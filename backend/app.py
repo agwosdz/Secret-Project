@@ -1,5 +1,6 @@
 from config import load_config, update_config
 from rtpmidi_service import RtpMIDISession
+from services.settings_service import SettingsService
 import colorsys
 import datetime
 import math
@@ -67,6 +68,9 @@ LED_COUNT = 246
 
 # Initialize LED controller first
 led_controller = LEDController(num_pixels=LED_COUNT)
+
+# Initialize settings service
+settings_service = SettingsService(websocket_callback=socketio.emit)
 
 # Initialize services that depend on LED controller
 usb_midi_service = USBMIDIInputService(led_controller=led_controller, websocket_callback=socketio.emit) if USBMIDIInputService else None
@@ -405,128 +409,13 @@ def get_performance_metrics():
             'message': 'An unexpected error occurred while getting performance metrics'
         }), 500
 
-@app.route('/api/settings/led_count', methods=['GET'])
-def get_led_count():
-    """Get the current LED count from settings"""
-    try:
-        return jsonify({
-            'led_count': LED_COUNT
-        }), 200
-    except Exception as e:
-        logger.error(f"Error getting LED count: {e}")
-        return jsonify({
-            'error': 'Internal Server Error',
-            'message': 'An unexpected error occurred while getting LED count'
-        }), 500
+# Legacy settings endpoints - replaced by centralized settings service
+# These endpoints have been moved to /api/settings/* via the settings blueprint
 
-@app.route('/api/settings', methods=['GET'])
-def get_settings():
-    """Get all current settings"""
-    try:
-        config = load_config()
-        return jsonify(config), 200
-    except Exception as e:
-        logger.error(f"Error getting settings: {e}")
-        return jsonify({
-            'error': 'Internal Server Error',
-            'message': 'An unexpected error occurred while getting settings'
-        }), 500
 
-@app.route('/api/settings', methods=['POST'])
-def update_settings():
-    """Update settings with validation"""
-    global led_controller, playback_service, midi_input_manager
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({
-                'error': 'Bad Request',
-                'message': 'No JSON data provided'
-            }), 400
-        
-        # Load current config
-        current_config = load_config()
-        
-        # Update only provided fields
-        updated_config = current_config.copy()
-        updated_config.update(data)
-        
-        # Handle piano size changes
-        if 'piano_size' in data and data['piano_size'] != 'custom':
-            piano_size = data['piano_size']
-            specs = get_piano_specs(piano_size)
-            if 'led_count' not in data:  # Only auto-update if not explicitly set
-                updated_config['led_count'] = specs.get('keys', 88)
-        
-        # Validate configuration
-        validation_errors = validate_config(updated_config)
-        if validation_errors:
-            return jsonify({
-                'error': 'Validation Error',
-                'message': 'Configuration validation failed',
-                'details': validation_errors
-            }), 400
-        
-        # Save configuration
-        save_config(updated_config)
-        
-        # Reinitialize LED controller if hardware settings changed
-        hardware_fields = ['gpio_pin', 'led_count', 'led_frequency', 'led_dma', 'led_channel', 'led_invert', 'brightness', 'led_orientation']
-        if any(field in data for field in hardware_fields) and led_controller:
-            try:
-                # Clean up existing controller
-                if hasattr(led_controller, 'cleanup'):
-                    led_controller.cleanup()
-                
-                # Create new controller with updated configuration
-                led_controller = LEDController(
-                    pin=updated_config.get('gpio_pin', 18),
-                    num_pixels=updated_config.get('led_count', 246),
-                    brightness=updated_config.get('brightness', 0.5)
-                )
-                logger.info("LED controller reinitialized with new settings")
-                
-                # Reinitialize playback service with new LED controller and configuration
-                if playback_service:
-                    # Stop current playback and clean up
-                    playback_service.stop_playback()
-                    
-                    # Create new playback service with updated configuration
-                    playback_service = PlaybackService(led_controller=led_controller, midi_parser=midi_parser)
-                    playback_service.add_status_callback(websocket_status_callback)
-                    logger.info("Playback service reinitialized with new LED controller and configuration")
-                    
-                # Update MIDI input manager with new LED controller
-                if midi_input_manager and hasattr(midi_input_manager, '_led_controller'):
-                    midi_input_manager._led_controller = led_controller
-                    # Reinitialize USB MIDI service if it exists
-                    if hasattr(midi_input_manager, 'usb_midi_service') and midi_input_manager.usb_midi_service:
-                        midi_input_manager.usb_midi_service._led_controller = led_controller
-                        # Update configuration-dependent properties
-                        piano_size = updated_config.get('piano_size', '88-key')
-                        piano_specs = get_piano_specs(piano_size)
-                        midi_input_manager.usb_midi_service.num_leds = piano_specs['keys']
-                        midi_input_manager.usb_midi_service.min_midi_note = piano_specs['midi_start']
-                        midi_input_manager.usb_midi_service.max_midi_note = piano_specs['midi_end']
-                        midi_input_manager.usb_midi_service.led_orientation = updated_config.get('led_orientation', 'normal')
-                        logger.info("MIDI input manager updated with new LED controller and configuration")
-                    
-            except Exception as e:
-                logger.error(f"Failed to reinitialize LED controller: {e}")
-                return jsonify({
-                    'error': 'Hardware Error',
-                    'message': f'Settings saved but LED controller failed to reinitialize: {str(e)}'
-                }), 500
-        
-        return jsonify({'message': 'Settings updated successfully'}), 200
-        
-    except Exception as e:
-        logger.error(f"Error updating settings: {e}")
-        return jsonify({
-            'error': 'Internal Server Error',
-            'message': 'An unexpected error occurred while updating settings'
-        }), 500
-
+# Register settings API blueprint
+from api.settings import settings_bp
+app.register_blueprint(settings_bp, url_prefix='/api/settings')
 
 @app.route('/api/test-hardware', methods=['POST'])
 def test_hardware():

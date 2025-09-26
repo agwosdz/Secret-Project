@@ -1,56 +1,31 @@
 <script>
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { settings, settingsLoading, settingsError, loadSettings, updateSettings } from '$lib/stores/settings.js';
 	import PianoKeyboardSelector from '$lib/components/PianoKeyboardSelector.svelte';
 	import GPIOConfigPanel from '$lib/components/GPIOConfigPanel.svelte';
 	import LEDStripConfig from '$lib/components/LEDStripConfig.svelte';
 	import LEDTestSequence from '$lib/components/LEDTestSequence.svelte';
 import ConfigurationManager from '$lib/components/ConfigurationManager.svelte';
 
-	let settings = {
-		// Piano configuration
-		piano_size: '88-key',
-		key_mapping: {},
-		mapping_mode: 'auto',
-		key_offset: 0,
-		leds_per_key: 3,
-		mapping_base_offset: 0,
-		
-		// GPIO configuration
-		gpio_pin: 18,
-		gpio_power_pin: null,
-		gpio_ground_pin: null,
-		signal_level: 3.3,
-		led_frequency: 800000,
-		led_dma: 10,
-		led_channel: 0,
-		led_invert: false,
-		
-		// LED strip configuration
-		led_count: 246,
-		max_led_count: 300,
-		led_type: 'WS2812B',
-		led_orientation: 'normal',
-		led_strip_type: 'WS2811_STRIP_GRB',
-		power_supply_voltage: 5.0,
-		power_supply_current: 10.0,
-		brightness: 0.5,
-		
-		// Advanced settings
-		color_temperature: 6500,
-		gamma_correction: 2.2,
-		color_balance: { red: 1.0, green: 1.0, blue: 1.0 },
-		auto_detect_hardware: true,
-		validate_gpio_pins: true,
-		hardware_test_enabled: true
-	};
-
-	let loading = false;
+	// Component state
 	let message = '';
 	let messageType = 'info';
 	let activeTab = 'piano';
 	let hasUnsavedChanges = false;
 	let originalSettings = {};
+
+	// Reactive statements
+	$: loading = $settingsLoading;
+	$: error = $settingsError;
+	$: currentSettings = $settings;
+
+	// Watch for changes to detect unsaved changes
+	$: {
+		if (Object.keys(originalSettings).length > 0) {
+			hasUnsavedChanges = JSON.stringify(currentSettings) !== JSON.stringify(originalSettings);
+		}
+	}
 
 	const tabs = [
 		{ id: 'piano', label: 'Piano Setup', icon: '🎹' },
@@ -77,102 +52,77 @@ import ConfigurationManager from '$lib/components/ConfigurationManager.svelte';
 	];
 
 	onMount(async () => {
-		await loadSettings();
+		await loadSettingsData();
 	});
 
-	async function loadSettings() {
+	async function loadSettingsData() {
 		try {
-			loading = true;
-			const response = await fetch('/api/settings');
-			if (response.ok) {
-				settings = await response.json();
-				originalSettings = JSON.parse(JSON.stringify(settings));
-				hasUnsavedChanges = false;
-			} else {
-				showMessage('Failed to load settings', 'error');
-			}
+			await loadSettings();
+			originalSettings = JSON.parse(JSON.stringify($settings));
+			hasUnsavedChanges = false;
 		} catch (error) {
 			console.error('Error loading settings:', error);
 			showMessage('Error loading settings', 'error');
-		} finally {
-			loading = false;
 		}
 	}
 
 	async function saveSettings() {
-		loading = true;
 		try {
-			const response = await fetch('/api/settings', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(settings)
-			});
-
-			if (response.ok) {
-				originalSettings = JSON.parse(JSON.stringify(settings));
-				hasUnsavedChanges = false;
-				showMessage('Settings saved successfully!', 'success');
-			} else {
-				const error = await response.json();
-				showMessage(error.error || 'Failed to save settings', 'error');
-			}
+			await updateSettings(currentSettings);
+			originalSettings = JSON.parse(JSON.stringify(currentSettings));
+			hasUnsavedChanges = false;
+			showMessage('Settings saved successfully!', 'success');
 		} catch (error) {
 			console.error('Error saving settings:', error);
-			showMessage('Error saving settings', 'error');
-		} finally {
-			loading = false;
+			showMessage(error.message || 'Failed to save settings', 'error');
 		}
-	}
-
-	function resetSettings() {
-		if (confirm('Are you sure you want to reset all changes?')) {
-			settings = JSON.parse(JSON.stringify(originalSettings));
-			hasUnsavedChanges = false;
-			showMessage('Settings reset to last saved state', 'info');
 		}
+}
+
+function resetSettings() {
+	if (confirm('Are you sure you want to reset all changes?')) {
+		// Reset to original settings by updating the store
+		updateSettings(originalSettings);
+		hasUnsavedChanges = false;
+		showMessage('Settings reset to last saved state', 'info');
 	}
+}
 
-	async function testHardware() {
-		try {
-			loading = true;
-			showMessage('Testing hardware configuration...', 'info');
-			
-			const response = await fetch('/api/test-hardware', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify(settings)
-			});
+async function testHardware() {
+	try {
+		showMessage('Testing hardware configuration...', 'info');
+		
+		const response = await fetch('/api/test-hardware', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(currentSettings)
+		});
 
-			if (response.ok) {
-				const result = await response.json();
-				showMessage(`Hardware test ${result.success ? 'passed' : 'failed'}: ${result.message}`, result.success ? 'success' : 'error');
-			} else {
-				showMessage('Hardware test failed', 'error');
-			}
-		} catch (error) {
-			console.error('Error testing hardware:', error);
-			showMessage('Error testing hardware', 'error');
-		} finally {
-			loading = false;
+		if (response.ok) {
+			const result = await response.json();
+			showMessage(`Hardware test ${result.success ? 'passed' : 'failed'}: ${result.message}`, result.success ? 'success' : 'error');
+		} else {
+			showMessage('Hardware test failed', 'error');
 		}
+	} catch (error) {
+		console.error('Error testing hardware:', error);
+		showMessage('Error testing hardware', 'error');
 	}
+}
 
-	function handleSettingsChange(newSettings) {
-		settings = { ...settings, ...newSettings };
-		hasUnsavedChanges = JSON.stringify(settings) !== JSON.stringify(originalSettings);
-	}
+function handleSettingsChange(newSettings) {
+	updateSettings({ ...currentSettings, ...newSettings });
+}
 
-	function showMessage(text, type) {
-		message = text;
-		messageType = type;
-		setTimeout(() => {
-			message = '';
-		}, 5000);
-	}
+function showMessage(text, type) {
+	message = text;
+	messageType = type;
+	setTimeout(() => {
+		message = '';
+	}, 5000);
+}
 </script>
 
 <svelte:head>
@@ -211,27 +161,27 @@ import ConfigurationManager from '$lib/components/ConfigurationManager.svelte';
 		<div class="p-6">
 			{#if activeTab === 'piano'}
 				<PianoKeyboardSelector 
-					bind:settings={settings}
+					bind:settings={currentSettings}
 					on:change={(e) => handleSettingsChange(e.detail)}
 				/>
 			{:else if activeTab === 'gpio'}
 				<GPIOConfigPanel 
-					bind:settings={settings}
+					bind:settings={currentSettings}
 					on:change={(e) => handleSettingsChange(e.detail)}
 				/>
 			{:else if activeTab === 'led'}
 				<LEDStripConfig 
-					bind:settings={settings}
+					bind:settings={currentSettings}
 					on:change={(e) => handleSettingsChange(e.detail)}
 				/>
 			{:else if activeTab === 'test'}
 				<LEDTestSequence 
-					bind:settings={settings}
+					bind:settings={currentSettings}
 					on:change={(e) => handleSettingsChange(e.detail)}
 				/>
 			{:else if activeTab === 'config'}
 				<ConfigurationManager 
-					bind:settings={settings}
+					bind:settings={currentSettings}
 					on:change={(e) => handleSettingsChange(e.detail)}
 				/>
 			{:else if activeTab === 'advanced'}
@@ -249,7 +199,7 @@ import ConfigurationManager from '$lib/components/ConfigurationManager.svelte';
 							min="2700"
 							max="10000"
 							step="100"
-							bind:value={settings.color_temperature}
+							bind:value={currentSettings.color_temperature}
 							on:input={() => handleSettingsChange({})}
 							class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 						/>
@@ -269,7 +219,7 @@ import ConfigurationManager from '$lib/components/ConfigurationManager.svelte';
 							min="1.0"
 							max="3.0"
 							step="0.1"
-							bind:value={settings.gamma_correction}
+							bind:value={currentSettings.gamma_correction}
 							on:input={() => handleSettingsChange({})}
 							class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 						/>
@@ -286,7 +236,7 @@ import ConfigurationManager from '$lib/components/ConfigurationManager.svelte';
 							<input
 								id="auto_detect_hardware"
 								type="checkbox"
-								bind:checked={settings.auto_detect_hardware}
+								bind:checked={currentSettings.auto_detect_hardware}
 								on:change={() => handleSettingsChange({})}
 								class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
 							/>
@@ -299,7 +249,7 @@ import ConfigurationManager from '$lib/components/ConfigurationManager.svelte';
 							<input
 								id="validate_gpio_pins"
 								type="checkbox"
-								bind:checked={settings.validate_gpio_pins}
+								bind:checked={currentSettings.validate_gpio_pins}
 								on:change={() => handleSettingsChange({})}
 								class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
 							/>
@@ -312,7 +262,7 @@ import ConfigurationManager from '$lib/components/ConfigurationManager.svelte';
 							<input
 								id="hardware_test_enabled"
 								type="checkbox"
-								bind:checked={settings.hardware_test_enabled}
+								bind:checked={currentSettings.hardware_test_enabled}
 								on:change={() => handleSettingsChange({})}
 								class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
 							/>
@@ -348,7 +298,7 @@ import ConfigurationManager from '$lib/components/ConfigurationManager.svelte';
 			</div>
 
 			<div class="flex space-x-3">
-				{#if settings.hardware_test_enabled}
+				{#if currentSettings.hardware_test_enabled}
 					<button
 						type="button"
 						on:click={testHardware}
