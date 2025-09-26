@@ -76,8 +76,7 @@ import ConfigurationManager from '$lib/components/ConfigurationManager.svelte';
 			console.error('Error saving settings:', error);
 			showMessage(error.message || 'Failed to save settings', 'error');
 		}
-		}
-}
+	}
 
 function resetSettings() {
 	if (confirm('Are you sure you want to reset all changes?')) {
