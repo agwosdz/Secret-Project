@@ -3,7 +3,6 @@
 	import { browser } from '$app/environment';
 	import { settings, getSetting } from '$lib/stores/settings.js';
 	import LEDVisualization from '$lib/components/LEDVisualization.svelte';
-	import DashboardControls from '$lib/components/DashboardControls.svelte';
 	import PerformanceMonitor from '$lib/components/PerformanceMonitor.svelte';
 	import MidiDeviceSelector from '$lib/components/MidiDeviceSelector.svelte';
 	import NetworkMidiConfig from '$lib/components/NetworkMidiConfig.svelte';
@@ -275,105 +274,6 @@
 		initializeWebSocket();
 	}
 
-	// Handle manual LED testing from controls
-	function handleLEDTest(event) {
-		const { ledIndex, color, brightness } = event.detail;
-		if (websocket && connectionStatus === 'connected') {
-			websocket.emit('test_led', {
-				index: ledIndex,
-				r: color.r,
-				g: color.g,
-				b: color.b,
-				brightness: brightness
-			});
-		}
-	}
-
-	// Handle pattern testing
-	function handlePatternTest(event) {
-		const { pattern, duration } = event.detail;
-		if (websocket && connectionStatus === 'connected') {
-			websocket.emit('test_pattern', {
-				pattern: pattern,
-				duration_ms: duration
-			});
-		}
-	}
-
-	// Handle LED count change
-	function handleLEDCountChange(event) {
-		const newLedCount = event.detail.ledCount;
-		if (newLedCount !== ledCount) {
-			ledCount = newLedCount;
-			initializeLEDState(ledCount);
-			
-			// Notify backend of LED count change
-			if (websocket && connectionStatus === 'connected') {
-				websocket.emit('led_count_change', {
-					ledCount: ledCount
-				});
-				
-				// Provide visual feedback by illuminating LEDs incrementally
-				// First clear all LEDs
-				websocket.emit('test_led', {
-					index: -1, // -1 indicates all LEDs
-					r: 0,
-					g: 0,
-					b: 0,
-					brightness: 0
-				});
-				
-				// Then illuminate LEDs incrementally to show the new count
-				setTimeout(() => {
-					// Test each LED sequentially with a delay
-					for (let i = 0; i < ledCount; i++) {
-						setTimeout(() => {
-							websocket.emit('test_led', {
-								index: i,
-								r: 0,
-								g: 255,
-								b: 0,
-								brightness: 0.8
-							});
-						}, i * 10); // Fast illumination
-					}
-				}, 100);
-			}
-		}
-	}
-
-	// Handle test all LEDs functionality
-	function handleTestAll(event) {
-		const { color, brightness, delay, ledCount: testLedCount } = event.detail;
-		const actualLedCount = testLedCount || ledCount;
-		
-		if (websocket && connectionStatus === 'connected') {
-			// Test each LED sequentially with a delay
-			for (let i = 0; i < actualLedCount; i++) {
-				setTimeout(() => {
-					websocket.emit('test_led', {
-						index: i,
-						r: color.r,
-						g: color.g,
-						b: color.b,
-						brightness: brightness
-					});
-				}, i * delay);
-			}
-			
-			// Clear all LEDs after the test completes
-			setTimeout(() => {
-				websocket.emit('test_led', {
-					index: -1, // Clear all
-					r: 0,
-					g: 0,
-					b: 0,
-					brightness: 0
-				});
-			}, actualLedCount * delay + 1000); // Wait for all LEDs + 1 second
-		}
-	}
-
 	// Fetch system status from backend
 	async function fetchSystemStatus() {
 		try {
@@ -573,19 +473,6 @@
 					responsive={true}
 				/>
 			{/if}
-		</section>
-
-		<!-- Dashboard Controls Section -->
-		<section class="controls-section">
-			<h2>LED Controls</h2>
-			<DashboardControls 
-				{ledCount}
-				{connectionStatus}
-				on:ledTest={handleLEDTest}
-				on:patternTest={handlePatternTest}
-				on:ledCountChange={handleLEDCountChange}
-				on:testAll={handleTestAll}
-			/>
 		</section>
 
 		<!-- Performance Monitor Section -->
@@ -815,7 +702,7 @@
 	}
 
 	/* Dashboard-specific styles */
-	.visualization-section, .controls-section, .performance-section, .midi-section, .system-details-section {
+	.visualization-section, .performance-section, .midi-section, .system-details-section {
 		background: white;
 		border: 1px solid #e9ecef;
 		border-radius: 12px;
