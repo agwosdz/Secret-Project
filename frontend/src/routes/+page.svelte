@@ -44,8 +44,8 @@
 
 	// MIDI device management
 	let selectedMidiDevice = null;
-	let midiDevicesExpanded = false;
-	let networkMidiExpanded = false;
+	let midiDevicesExpanded = true; // Expanded by default
+	let networkMidiExpanded = true; // Expanded by default
 
 	// MIDI connection status
 	let usbMidiStatus = {
@@ -500,12 +500,17 @@
 
 			<div class="midi-panels">
 				<div class="midi-panel">
-					<div class="panel-header" on:click={() => midiDevicesExpanded = !midiDevicesExpanded}>
+					<button 
+						class="panel-header" 
+						type="button"
+						on:click={() => midiDevicesExpanded = !midiDevicesExpanded}
+						on:keydown={(e) => e.key === 'Enter' && (midiDevicesExpanded = !midiDevicesExpanded)}
+					>
 						<h3>USB MIDI Devices</h3>
 						<span class="expand-icon {midiDevicesExpanded ? 'expanded' : ''}">
 							{midiDevicesExpanded ? '▼' : '▶'}
 						</span>
-					</div>
+					</button>
 					{#if midiDevicesExpanded}
 						<div class="panel-content">
 							<MidiDeviceSelector 
@@ -517,12 +522,17 @@
 				</div>
 
 				<div class="midi-panel">
-					<div class="panel-header" on:click={() => networkMidiExpanded = !networkMidiExpanded}>
+					<button 
+						class="panel-header" 
+						type="button"
+						on:click={() => networkMidiExpanded = !networkMidiExpanded}
+						on:keydown={(e) => e.key === 'Enter' && (networkMidiExpanded = !networkMidiExpanded)}
+					>
 						<h3>Network MIDI (RTP-MIDI)</h3>
 						<span class="expand-icon {networkMidiExpanded ? 'expanded' : ''}">
 							{networkMidiExpanded ? '▼' : '▶'}
 						</span>
-					</div>
+					</button>
 					{#if networkMidiExpanded}
 						<div class="panel-content">
 							<NetworkMidiConfig 
@@ -911,6 +921,10 @@
 		justify-content: space-between;
 		align-items: center;
 		transition: background-color 0.2s;
+		border: none;
+		width: 100%;
+		text-align: left;
+		font-family: inherit;
 	}
 
 	.panel-header:hover {
