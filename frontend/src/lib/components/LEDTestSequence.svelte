@@ -21,7 +21,7 @@
 
   onMount(() => {
     // Connect to WebSocket
-    socket = io('http://localhost:5000');
+    socket = io('http://localhost:5001');
     
     socket.on('connect', () => {
       isConnected = true;

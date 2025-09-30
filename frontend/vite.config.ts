@@ -1,8 +1,8 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
-// Get backend port from environment variable, default to 5000
-const BACKEND_PORT = process.env.VITE_BACKEND_PORT || process.env.FLASK_PORT || '5000';
+// Get backend port from environment variable, default to 5001 for RPI
+const BACKEND_PORT = process.env.VITE_BACKEND_PORT || process.env.FLASK_PORT || '5001';
 const BACKEND_HOST = process.env.VITE_BACKEND_HOST || 'localhost';
 const backendTarget = `http://${BACKEND_HOST}:${BACKEND_PORT}`;
 

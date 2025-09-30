@@ -82,7 +82,7 @@
 	onMount(async () => {
 		// Check backend health first
 		try {
-			const response = await fetch('http://localhost:5000/health');
+			const response = await fetch('http://localhost:5001/health');
 			if (response.ok) {
 				const data = await response.json();
 				backendStatus = data.status;
@@ -632,7 +632,7 @@
 		<p>This is the foundation setup for the Piano LED Visualizer. The system is ready for development!</p>
 		<ul>
 			<li>✅ Monorepo structure initialized</li>
-			<li>✅ Flask backend running on port 5000</li>
+			<li>✅ Flask backend running on port 5001</li>
 			<li>✅ SvelteKit frontend running on port 5173</li>
 			<li>✅ Health check endpoint working</li>
 		</ul>

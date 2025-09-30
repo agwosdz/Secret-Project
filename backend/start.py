@@ -15,7 +15,7 @@ sys.path.insert(0, str(backend_dir))
 # Set default environment variables
 os.environ.setdefault('FLASK_DEBUG', 'True')
 os.environ.setdefault('FLASK_HOST', '0.0.0.0')
-os.environ.setdefault('FLASK_PORT', '5000')
+os.environ.setdefault('FLASK_PORT', '5001')
 
 if __name__ == '__main__':
     try:
