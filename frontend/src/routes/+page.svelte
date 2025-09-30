@@ -122,7 +122,15 @@
 		try {
 			// Use Socket.IO client if available, otherwise fallback to WebSocket
 			if (typeof io !== 'undefined') {
-				websocket = io();
+				// Use the global socket config if available
+				const config = window.socketIOConfig || {
+					forceNew: true,
+					reconnection: true,
+					timeout: 5000,
+					transports: ['polling', 'websocket']
+				};
+				
+				websocket = io(config);
 				
 				websocket.on('connect', () => {
 					console.log('Dashboard WebSocket connected');

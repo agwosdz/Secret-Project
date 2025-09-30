@@ -189,6 +189,47 @@ class StatusCommunicationManager {
 		}
 	}
 
+	// Generic showMessage method for backward compatibility
+	showMessage(message: string, type: StatusMessage['type'] = 'info', options: {
+		title?: string;
+		duration?: number;
+		actions?: StatusAction[];
+		icon?: string;
+		persistent?: boolean;
+	} = {}): string {
+		return this.addMessage({
+			type,
+			title: options.title || this.getDefaultTitle(type),
+			message,
+			duration: options.duration,
+			actions: options.actions,
+			icon: options.icon || this.getDefaultIcon(type),
+			persistent: options.persistent
+		});
+	}
+
+	private getDefaultTitle(type: StatusMessage['type']): string {
+		switch (type) {
+			case 'success': return 'Success';
+			case 'error': return 'Error';
+			case 'warning': return 'Warning';
+			case 'loading': return 'Loading';
+			case 'info':
+			default: return 'Info';
+		}
+	}
+
+	private getDefaultIcon(type: StatusMessage['type']): string {
+		switch (type) {
+			case 'success': return '✅';
+			case 'error': return '❌';
+			case 'warning': return '⚠️';
+			case 'loading': return '⏳';
+			case 'info':
+			default: return 'ℹ️';
+		}
+	}
+
 	// Convenience Methods
 	success(title: string, message: string, actions?: StatusAction[]): string {
 		return this.addMessage({
