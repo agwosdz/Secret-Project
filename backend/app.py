@@ -9,6 +9,7 @@ import time
 
 import logging
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 
 # Initialize Flask app and SocketIO early so decorators work
@@ -19,6 +20,9 @@ app.config['HOST'] = os.getenv('FLASK_HOST', '0.0.0.0')
 app.config['PORT'] = int(os.getenv('FLASK_PORT', '5000'))
 app.config.setdefault('UPLOAD_FOLDER', os.path.join(os.path.dirname(__file__), 'uploads'))
 app.config.setdefault('MAX_CONTENT_LENGTH', 1 * 1024 * 1024)
+
+# Enable CORS for all routes
+CORS(app)
 
 socketio = SocketIO(app, cors_allowed_origins='*')
 
