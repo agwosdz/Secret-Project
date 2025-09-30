@@ -1,0 +1,21 @@
+[Unit]
+Description=Piano LED Visualizer Backend Monitor
+After=network.target piano-led-visualizer.service
+Wants=piano-led-visualizer.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/Secret-Project/backend
+ExecStart=/home/pi/Secret-Project/backend/venv/bin/python /home/pi/Secret-Project/backend/monitor.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Environment
+Environment=PYTHONPATH=/home/pi/Secret-Project/backend
+
+[Install]
+WantedBy=multi-user.target

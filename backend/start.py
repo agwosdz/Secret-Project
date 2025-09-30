@@ -13,7 +13,7 @@ backend_dir = Path(__file__).parent
 sys.path.insert(0, str(backend_dir))
 
 # Set default environment variables
-os.environ.setdefault('FLASK_DEBUG', 'True')
+os.environ.setdefault('FLASK_DEBUG', 'False')  # Disabled for production stability
 os.environ.setdefault('FLASK_HOST', '0.0.0.0')
 os.environ.setdefault('FLASK_PORT', '5001')
 
