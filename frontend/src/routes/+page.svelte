@@ -82,7 +82,7 @@
 	onMount(async () => {
 		// Check backend health first
 		try {
-			const response = await fetch('http://localhost:5001/health');
+			const response = await fetch('/health');
 			if (response.ok) {
 				const data = await response.json();
 				backendStatus = data.status;
