@@ -9,10 +9,10 @@ export const settingsSchema = {
         type: 'object',
         required: ['enabled', 'octave'],
         properties: {
-            enabled: { type: 'boolean' },
-            octave: { type: 'number', minimum: 0, maximum: 8 },
-            velocity_sensitivity: { type: 'number', minimum: 0, maximum: 127 },
-            channel: { type: 'number', minimum: 1, maximum: 16 }
+            enabled: { type: 'boolean', default: false },
+            octave: { type: 'number', minimum: 0, maximum: 8, default: 4 },
+            velocity_sensitivity: { type: 'number', minimum: 0, maximum: 127, default: 64 },
+            channel: { type: 'number', minimum: 1, maximum: 16, default: 1 }
         }
     },
     
@@ -20,21 +20,22 @@ export const settingsSchema = {
         type: 'object',
         required: ['enabled', 'pins'],
         properties: {
-            enabled: { type: 'boolean' },
+            enabled: { type: 'boolean', default: false },
             pins: {
                 type: 'array',
+                default: [],
                 items: {
                     type: 'object',
                     required: ['pin', 'mode', 'note'],
                     properties: {
                         pin: { type: 'number', minimum: 1, maximum: 40 },
-                        mode: { type: 'string', enum: ['input', 'output'] },
+                        mode: { type: 'string', enum: ['input', 'output'], default: 'input' },
                         note: { type: 'number', minimum: 0, maximum: 127 },
-                        pullup: { type: 'boolean' }
+                        pullup: { type: 'boolean', default: true }
                     }
                 }
             },
-            debounce_time: { type: 'number', minimum: 0, maximum: 1000 }
+            debounce_time: { type: 'number', minimum: 0, maximum: 1000, default: 50 }
         }
     },
     
@@ -42,16 +43,16 @@ export const settingsSchema = {
         type: 'object',
         required: ['enabled', 'count', 'brightness'],
         properties: {
-            enabled: { type: 'boolean' },
-            count: { type: 'number', minimum: 1, maximum: 1000 },
-            brightness: { type: 'number', minimum: 0, maximum: 100 },
-            color_temperature: { type: 'number', minimum: 2000, maximum: 10000 },
-            gamma_correction: { type: 'number', minimum: 1.0, maximum: 3.0 },
-            strip_type: { type: 'string', enum: ['WS2812B', 'WS2811', 'APA102', 'SK6812'] },
-            data_pin: { type: 'number', minimum: 1, maximum: 40 },
-            clock_pin: { type: 'number', minimum: 1, maximum: 40 },
-            reverse_order: { type: 'boolean' },
-            color_mode: { type: 'string', enum: ['rainbow', 'velocity', 'note', 'custom'] }
+            enabled: { type: 'boolean', default: false },
+            count: { type: 'number', minimum: 1, maximum: 1000, default: 88 },
+            brightness: { type: 'number', minimum: 0, maximum: 100, default: 50 },
+            color_temperature: { type: 'number', minimum: 2000, maximum: 10000, default: 6500 },
+            gamma_correction: { type: 'number', minimum: 1.0, maximum: 3.0, default: 2.2 },
+            strip_type: { type: 'string', enum: ['WS2812B', 'WS2811', 'APA102', 'SK6812'], default: 'WS2812B' },
+            data_pin: { type: 'number', minimum: 1, maximum: 40, default: 18 },
+            clock_pin: { type: 'number', minimum: 1, maximum: 40, default: 19 },
+            reverse_order: { type: 'boolean', default: false },
+            color_mode: { type: 'string', enum: ['rainbow', 'velocity', 'note', 'custom'], default: 'velocity' }
         }
     },
     
@@ -59,12 +60,12 @@ export const settingsSchema = {
         type: 'object',
         required: ['enabled', 'volume'],
         properties: {
-            enabled: { type: 'boolean' },
-            volume: { type: 'number', minimum: 0, maximum: 100 },
-            sample_rate: { type: 'number', enum: [22050, 44100, 48000, 96000] },
-            buffer_size: { type: 'number', enum: [64, 128, 256, 512, 1024] },
-            latency: { type: 'number', minimum: 0, maximum: 1000 },
-            device_id: { type: 'string' }
+            enabled: { type: 'boolean', default: false },
+            volume: { type: 'number', minimum: 0, maximum: 100, default: 50 },
+            sample_rate: { type: 'number', enum: [22050, 44100, 48000, 96000], default: 44100 },
+            buffer_size: { type: 'number', enum: [64, 128, 256, 512, 1024], default: 256 },
+            latency: { type: 'number', minimum: 0, maximum: 1000, default: 100 },
+            device_id: { type: 'string', default: '' }
         }
     },
     
@@ -72,12 +73,12 @@ export const settingsSchema = {
         type: 'object',
         required: ['auto_detect_midi', 'auto_detect_gpio', 'auto_detect_led'],
         properties: {
-            auto_detect_midi: { type: 'boolean' },
-            auto_detect_gpio: { type: 'boolean' },
-            auto_detect_led: { type: 'boolean' },
-            midi_device_id: { type: 'string' },
-            rtpmidi_enabled: { type: 'boolean' },
-            rtpmidi_port: { type: 'number', minimum: 1024, maximum: 65535 }
+            auto_detect_midi: { type: 'boolean', default: true },
+            auto_detect_gpio: { type: 'boolean', default: true },
+            auto_detect_led: { type: 'boolean', default: true },
+            midi_device_id: { type: 'string', default: '' },
+            rtpmidi_enabled: { type: 'boolean', default: false },
+            rtpmidi_port: { type: 'number', minimum: 1024, maximum: 65535, default: 5004 }
         }
     },
     
@@ -85,11 +86,11 @@ export const settingsSchema = {
         type: 'object',
         required: ['theme', 'debug'],
         properties: {
-            theme: { type: 'string', enum: ['light', 'dark', 'auto'] },
-            debug: { type: 'boolean' },
-            log_level: { type: 'string', enum: ['debug', 'info', 'warn', 'error'] },
-            auto_save: { type: 'boolean' },
-            backup_settings: { type: 'boolean' }
+            theme: { type: 'string', enum: ['light', 'dark', 'auto'], default: 'auto' },
+            debug: { type: 'boolean', default: false },
+            log_level: { type: 'string', enum: ['debug', 'info', 'warn', 'error'], default: 'info' },
+            auto_save: { type: 'boolean', default: true },
+            backup_settings: { type: 'boolean', default: true }
         }
     },
     
@@ -97,14 +98,15 @@ export const settingsSchema = {
         type: 'object',
         required: ['name', 'preferences'],
         properties: {
-            name: { type: 'string', maxLength: 100 },
-            email: { type: 'string', format: 'email' },
+            name: { type: 'string', maxLength: 100, default: 'User' },
+            email: { type: 'string', format: 'email', default: '' },
             preferences: {
                 type: 'object',
+                default: {},
                 properties: {
-                    show_tooltips: { type: 'boolean' },
-                    auto_connect: { type: 'boolean' },
-                    remember_window_size: { type: 'boolean' }
+                    show_tooltips: { type: 'boolean', default: true },
+                    auto_connect: { type: 'boolean', default: true },
+                    remember_window_size: { type: 'boolean', default: true }
                 }
             }
         }
@@ -184,6 +186,7 @@ export function getAllDefaults() {
     for (const category of Object.keys(settingsSchema)) {
         defaults[category] = getCategoryDefaults(category);
     }
+    console.log('getAllDefaults() generated:', JSON.stringify(defaults, null, 2));
     return defaults;
 }
 

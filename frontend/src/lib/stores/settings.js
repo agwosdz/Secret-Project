@@ -17,7 +17,118 @@ import {
 let autoSaveTimeout = null;
 const AUTO_SAVE_DELAY = 2000; // 2 seconds
 
+/**
+ * Migrate flat settings structure to nested schema structure
+ * This handles legacy localStorage data that may have a flat structure
+ */
+function migrateSettingsStructure(settings) {
+    // Check if settings already have proper nested structure
+    if (settings.led || settings.piano || settings.audio || settings.gpio || settings.hardware) {
+        return settings; // Already properly structured
+    }
+
+    // Define field mappings from flat structure to nested structure
+    const fieldMappings = {
+        // LED settings
+        'brightness': ['led', 'brightness'],
+        'ledCount': ['led', 'count'],
+        'maxLedCount': ['led', 'max_count'],
+        'ledType': ['led', 'strip_type'],
+        'ledOrientation': ['led', 'reverse_order'],
+        'ledStripType': ['led', 'strip_type'],
+        'powerSupplyVoltage': ['led', 'power_supply_voltage'],
+        'powerSupplyCurrent': ['led', 'power_supply_current'],
+        'gamma': ['led', 'gamma_correction'],
+        'colorTemp': ['led', 'color_temperature'],
+        'led_orientation': ['led', 'reverse_order'],
+        'led_type': ['led', 'strip_type'],
+        
+        // Piano settings
+        'pianoEnabled': ['piano', 'enabled'],
+        'pianoSize': ['piano', 'size'],
+        'noteRange': ['piano', 'note_range'],
+        
+        // Audio settings
+        'audioEnabled': ['audio', 'enabled'],
+        'sampleRate': ['audio', 'sample_rate'],
+        'bufferSize': ['audio', 'buffer_size'],
+        'inputDevice': ['audio', 'input_device'],
+        
+        // GPIO settings
+        'gpioPin': ['gpio', 'led_pin'],
+        'gpioFreq': ['gpio', 'frequency'],
+        'gpioDma': ['gpio', 'dma_channel'],
+        
+        // Hardware settings
+        'hardwareType': ['hardware', 'type'],
+        'boardRevision': ['hardware', 'board_revision']
+    };
+
+    const migratedSettings = {};
+    
+    // Initialize category objects
+    const categories = ['led', 'piano', 'audio', 'gpio', 'hardware'];
+    categories.forEach(category => {
+        migratedSettings[category] = {};
+    });
+
+    // Migrate flat fields to nested structure
+    for (const [flatKey, value] of Object.entries(settings)) {
+        const mapping = fieldMappings[flatKey];
+        if (mapping) {
+            const [category, nestedKey] = mapping;
+            migratedSettings[category][nestedKey] = value;
+        } else {
+            // Keep unmapped fields at top level for now
+            migratedSettings[flatKey] = value;
+        }
+    }
+
+    // Fill in defaults for missing required fields
+    const defaults = getAllDefaults();
+    categories.forEach(category => {
+        if (defaults[category]) {
+            migratedSettings[category] = {
+                ...defaults[category],
+                ...migratedSettings[category]
+            };
+        }
+    });
+
+    console.log('Migrated settings from flat to nested structure:', migratedSettings);
+    return migratedSettings;
+}
+
 // Enhanced settings store with persistence
+/**
+ * Merge settings with defaults to ensure all required fields are present
+ */
+function mergeWithDefaults(settings, defaults) {
+    const merged = {};
+    
+    // Start with defaults
+    for (const [category, categoryDefaults] of Object.entries(defaults)) {
+        merged[category] = { ...categoryDefaults };
+        
+        // Merge in actual settings if they exist
+        if (settings[category] && typeof settings[category] === 'object') {
+            merged[category] = {
+                ...merged[category],
+                ...settings[category]
+            };
+        }
+    }
+    
+    // Add any additional categories from settings that aren't in defaults
+    for (const [category, categorySettings] of Object.entries(settings)) {
+        if (!merged[category]) {
+            merged[category] = categorySettings;
+        }
+    }
+    
+    return merged;
+}
+
 export const settings = writable({}, (set) => {
     // Load settings from localStorage on initialization
     if (browser) {
@@ -26,7 +137,16 @@ export const settings = writable({}, (set) => {
             if (stored) {
                 const parsedSettings = JSON.parse(stored);
                 console.log('Loaded settings from localStorage:', parsedSettings);
-                set(parsedSettings);
+                
+                // Migrate settings structure if needed
+                const migratedSettings = migrateSettingsStructure(parsedSettings);
+                set(migratedSettings);
+                
+                // Save migrated settings back to localStorage if structure changed
+                if (migratedSettings !== parsedSettings) {
+                    localStorage.setItem('piano-led-settings', JSON.stringify(migratedSettings));
+                    console.log('Migrated and saved settings structure');
+                }
             }
         } catch (error) {
             console.error('Failed to load settings from localStorage:', error);
@@ -230,80 +350,77 @@ class SettingsAPI {
         try {
             settingsLoading.set(true);
             settingsError.set(null);
+            console.log('loadAllSettings: Starting to load settings...');
             
-            const response = await fetch(this.baseUrl);
+            // Fetch settings from server
+            const response = await fetch('/api/settings');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
             
-            if (response.ok) {
-                const data = await response.json();
+            const serverSettings = await response.json();
+            console.log('loadAllSettings: Server settings received:', JSON.stringify(serverSettings, null, 2));
+            
+            // Validate server settings
+            const validation = validateAllSettings(serverSettings);
+            console.log('loadAllSettings: Server settings validation:', validation);
+            
+            if (validation.valid) {
+                // Merge with defaults to ensure all required fields are present
+                const defaultSettings = getAllDefaults();
+                console.log('loadAllSettings: Default settings:', JSON.stringify(defaultSettings, null, 2));
                 
-                // Validate and sanitize loaded settings
-                if (data && typeof data === 'object') {
-                    const settingsData = data.settings || data;
-                    
-                    // Validate loaded settings
-                    const validationResult = validateAllSettings(settingsData);
-                    if (!validationResult.valid) {
-                        console.warn('Loaded settings validation failed:', validationResult.errors);
-                        // Use defaults for invalid settings but don't fail completely
-                    }
-
-                    // Normalize settings structure with defaults
-                    const defaultSettings = getAllDefaults();
-                    const normalizedSettings = { ...defaultSettings };
-                    
-                    // Merge loaded settings with defaults
-                    for (const [category, categoryData] of Object.entries(settingsData)) {
-                        if (normalizedSettings[category]) {
-                            normalizedSettings[category] = { 
-                                ...normalizedSettings[category], 
-                                ...categoryData 
-                            };
-                        }
-                    }
-                    
-                    settings.set(normalizedSettings);
-                    console.log('Settings loaded and normalized successfully:', normalizedSettings);
-                    
-                    // Save to localStorage for backup
-                    if (browser) {
-                        localStorage.setItem('settings_backup', JSON.stringify(normalizedSettings));
-                    }
-                    
-                    return normalizedSettings;
-                } else {
-                    throw new Error('Invalid settings data received from server');
-                }
+                const mergedSettings = mergeWithDefaults(serverSettings, defaultSettings);
+                console.log('loadAllSettings: Merged settings:', JSON.stringify(mergedSettings, null, 2));
+                
+                // Update the settings store
+                settings.set(mergedSettings);
+                
+                // Save backup to localStorage
+                localStorage.setItem('settings_backup', JSON.stringify(mergedSettings));
+                console.log('loadAllSettings: Settings saved to localStorage backup');
+                
+                return mergedSettings;
             } else {
-                const errorData = await response.json().catch(() => ({}));
-                throw new Error(errorData.error || `Failed to load settings: ${response.status}`);
+                console.warn('loadAllSettings: Server settings validation failed:', validation.errors);
+                throw new Error('Invalid settings from server: ' + validation.errors.join(', '));
             }
         } catch (error) {
-            console.error('Error loading settings:', error);
-            settingsError.set(error.message);
+            console.error('loadAllSettings: Error loading from server:', error);
             
-            // Try to load from localStorage as fallback
-            if (browser) {
-                try {
-                    const backupSettings = localStorage.getItem('settings_backup');
-                    if (backupSettings) {
-                        const parsedSettings = JSON.parse(backupSettings);
-                        const validationResult = validateAllSettings(parsedSettings);
-                        
-                        if (validationResult.valid) {
-                            settings.set(parsedSettings);
-                            console.log('Loaded settings from localStorage backup');
-                            return parsedSettings;
-                        }
+            // Try to load from localStorage backup
+            try {
+                const backup = localStorage.getItem('settings_backup');
+                if (backup) {
+                    const backupSettings = JSON.parse(backup);
+                    console.log('loadAllSettings: Loaded backup settings:', JSON.stringify(backupSettings, null, 2));
+                    
+                    const validation = validateAllSettings(backupSettings);
+                    console.log('loadAllSettings: Backup settings validation:', validation);
+                    
+                    if (validation.valid) {
+                        console.log('loadAllSettings: Using valid backup settings');
+                        settings.set(backupSettings);
+                        return backupSettings;
+                    } else {
+                        console.warn('loadAllSettings: Backup settings validation failed:', validation.errors);
                     }
-                } catch (backupError) {
-                    console.error('Failed to load backup settings:', backupError);
                 }
+            } catch (backupError) {
+                console.error('loadAllSettings: Error loading backup:', backupError);
             }
             
-            // Final fallback to defaults
+            // Fall back to defaults
+            console.log('loadAllSettings: Falling back to default settings');
             const defaultSettings = getAllDefaults();
+            console.log('loadAllSettings: Using default settings:', JSON.stringify(defaultSettings, null, 2));
+            
+            // Update the settings store with defaults
             settings.set(defaultSettings);
-            console.log('Using default settings as fallback');
+            
+            // Save defaults as backup
+            localStorage.setItem('settings_backup', JSON.stringify(defaultSettings));
+            
             return defaultSettings;
         } finally {
             settingsLoading.set(false);
