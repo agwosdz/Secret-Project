@@ -53,6 +53,33 @@ DEFAULT_CONFIG = {
     "auto_detect_hardware": True,  # Enable automatic hardware detection
     "validate_gpio_pins": True,  # Validate GPIO pin availability
     "hardware_test_enabled": True,  # Enable hardware testing features
+    
+    # Enhanced LED configuration
+    "led_strip_type": "WS2811_STRIP_GRB",  # LED strip color order
+    "color_profile": "standard",  # Color profile: standard, warm_white, cool_white, music_viz
+    "performance_mode": "balanced",  # Performance mode: quality, balanced, performance
+    
+    # Advanced settings for enhanced LED control
+    "white_balance": {"r": 1.0, "g": 1.0, "b": 1.0},  # White balance RGB multipliers
+    "dither_enabled": True,  # Enable dithering for smoother color transitions
+    "update_rate": 60,  # LED update rate (Hz)
+    "power_limiting_enabled": False,  # Enable power limiting
+    "max_power_watts": 100,  # Maximum power consumption (W)
+    "thermal_protection_enabled": True,  # Enable thermal protection
+    "max_temperature_celsius": 85,  # Maximum operating temperature (°C)
+    
+    # Enhanced GPIO configuration
+    "gpio_pull_up": [],  # GPIO pins to configure with pull-up resistors
+    "gpio_pull_down": [],  # GPIO pins to configure with pull-down resistors
+    "pwm_range": 4096,  # PWM range for precise control
+    "spi_speed": 8000000,  # SPI speed for SPI-based LED strips (Hz)
+    
+    # Piano configuration enhancements
+    "piano_keys": 88,  # Number of piano keys
+    "piano_octaves": 7,  # Number of octaves
+    "piano_start_note": "A0",  # Starting note
+    "piano_end_note": "C8",  # Ending note
+    "key_mapping_mode": "chromatic",  # Key mapping mode: chromatic, white-keys-only, custom
 }
 
 # Configuration file path
@@ -217,6 +244,98 @@ def validate_config(config):
                     errors.append(f"color_balance must include {color} value")
                 elif not isinstance(color_balance[color], (int, float)) or not (0.0 <= color_balance[color] <= 2.0):
                     errors.append(f"color_balance.{color} must be between 0.0 and 2.0")
+    
+    # Validate color profile
+    if "color_profile" in config:
+        valid_profiles = ["standard", "warm_white", "cool_white", "music_viz"]
+        if config["color_profile"] not in valid_profiles:
+            errors.append(f"color_profile must be one of: {', '.join(valid_profiles)}")
+    
+    # Validate performance mode
+    if "performance_mode" in config:
+        valid_modes = ["quality", "balanced", "performance"]
+        if config["performance_mode"] not in valid_modes:
+            errors.append(f"performance_mode must be one of: {', '.join(valid_modes)}")
+    
+    # Validate white balance
+    if "white_balance" in config:
+        white_balance = config["white_balance"]
+        if not isinstance(white_balance, dict):
+            errors.append("white_balance must be a dictionary")
+        else:
+            for color in ["r", "g", "b"]:
+                if color not in white_balance:
+                    errors.append(f"white_balance must include {color} value")
+                elif not isinstance(white_balance[color], (int, float)) or not (0.0 <= white_balance[color] <= 2.0):
+                    errors.append(f"white_balance.{color} must be between 0.0 and 2.0")
+    
+    # Validate update rate
+    if "update_rate" in config:
+        rate = config["update_rate"]
+        if not isinstance(rate, (int, float)) or not (1 <= rate <= 120):
+            errors.append("update_rate must be between 1 and 120 Hz")
+    
+    # Validate max power watts
+    if "max_power_watts" in config:
+        power = config["max_power_watts"]
+        if not isinstance(power, (int, float)) or power <= 0:
+            errors.append("max_power_watts must be a positive number")
+    
+    # Validate max temperature
+    if "max_temperature_celsius" in config:
+        temp = config["max_temperature_celsius"]
+        if not isinstance(temp, (int, float)) or not (0 <= temp <= 150):
+            errors.append("max_temperature_celsius must be between 0 and 150")
+    
+    # Validate GPIO pull resistor configurations
+    for pull_key in ["gpio_pull_up", "gpio_pull_down"]:
+        if pull_key in config:
+            pins = config[pull_key]
+            if not isinstance(pins, list):
+                errors.append(f"{pull_key} must be a list")
+            else:
+                for pin in pins:
+                    if not isinstance(pin, int) or not (0 <= pin <= 27):
+                        errors.append(f"{pull_key} pin {pin} must be an integer between 0 and 27")
+    
+    # Validate PWM range
+    if "pwm_range" in config:
+        pwm_range = config["pwm_range"]
+        if not isinstance(pwm_range, int) or not (256 <= pwm_range <= 65536):
+            errors.append("pwm_range must be an integer between 256 and 65536")
+    
+    # Validate SPI speed
+    if "spi_speed" in config:
+        speed = config["spi_speed"]
+        if not isinstance(speed, int) or not (1000000 <= speed <= 32000000):
+            errors.append("spi_speed must be between 1MHz and 32MHz")
+    
+    # Validate piano configuration
+    if "piano_keys" in config:
+        keys = config["piano_keys"]
+        if not isinstance(keys, int) or not (25 <= keys <= 128):
+            errors.append("piano_keys must be between 25 and 128")
+    
+    if "piano_octaves" in config:
+        octaves = config["piano_octaves"]
+        if not isinstance(octaves, (int, float)) or not (2 <= octaves <= 10):
+            errors.append("piano_octaves must be between 2 and 10")
+    
+    # Validate key mapping mode
+    if "key_mapping_mode" in config:
+        valid_modes = ["chromatic", "white-keys-only", "custom"]
+        if config["key_mapping_mode"] not in valid_modes:
+            errors.append(f"key_mapping_mode must be one of: {', '.join(valid_modes)}")
+    
+    # Validate boolean flags
+    boolean_fields = [
+        "dither_enabled", "power_limiting_enabled", "thermal_protection_enabled",
+        "auto_detect_hardware", "validate_gpio_pins", "hardware_test_enabled",
+        "led_invert"
+    ]
+    for field in boolean_fields:
+        if field in config and not isinstance(config[field], bool):
+            errors.append(f"{field} must be a boolean value")
     
     # Validate key mapping
     if "key_mapping" in config:
@@ -482,26 +601,55 @@ def get_piano_specs(piano_size):
 
 
 def calculate_led_power_consumption(led_count, brightness=1.0, led_type="WS2812B"):
-    """Calculate estimated power consumption for LED strip"""
+    """Calculate estimated power consumption for LED strip with enhanced analysis"""
     # Power consumption per LED at full brightness (mA)
     led_power_specs = {
-        "WS2812B": 60,  # ~60mA per LED at full white
-        "WS2813": 60,
-        "WS2815": 60,
-        "APA102": 60,
-        "SK6812": 60
+        "WS2812B": {"current_ma": 60, "voltage": 5.0, "max_temp": 85},
+        "WS2813": {"current_ma": 60, "voltage": 5.0, "max_temp": 85},
+        "WS2815": {"current_ma": 60, "voltage": 12.0, "max_temp": 85},
+        "APA102": {"current_ma": 60, "voltage": 5.0, "max_temp": 85},
+        "SK6812": {"current_ma": 60, "voltage": 5.0, "max_temp": 85}
     }
     
-    power_per_led = led_power_specs.get(led_type, 60)
-    total_current = (led_count * power_per_led * brightness) / 1000  # Convert to Amps
-    total_watts_5v = round(total_current * 5.0, 2)
+    led_spec = led_power_specs.get(led_type, led_power_specs["WS2812B"])
+    power_per_led = led_spec["current_ma"]
+    voltage = led_spec["voltage"]
+    
+    # Calculate power consumption
+    total_current_ma = led_count * power_per_led * brightness
+    total_current_amps = total_current_ma / 1000
+    total_watts = round(total_current_amps * voltage, 2)
+    
+    # Calculate thermal considerations
+    heat_dissipation_per_led = 0.2  # Watts per LED at full brightness
+    total_heat = round(led_count * heat_dissipation_per_led * brightness, 2)
+    
+    # Power efficiency calculations
+    efficiency = 0.85  # Typical LED strip efficiency
+    actual_power_draw = round(total_watts / efficiency, 2)
+    
+    # Safety margins
+    recommended_supply_amps = round(total_current_amps * 1.2, 2)  # 20% safety margin
+    recommended_supply_watts = round(actual_power_draw * 1.3, 2)  # 30% safety margin
     
     return {
-        "current_amps": round(total_current, 2),
-        "current_ma": round(total_current * 1000),
-        "power_5v_watts": total_watts_5v,
-        "total_watts": total_watts_5v,  # alias for compatibility
-        "recommended_supply_amps": round(total_current * 1.2, 2)  # 20% safety margin
+        "led_count": led_count,
+        "brightness": brightness,
+        "led_type": led_type,
+        "voltage": voltage,
+        "current_amps": round(total_current_amps, 3),
+        "current_ma": round(total_current_ma),
+        "power_watts": total_watts,
+        "total_watts": total_watts,  # alias for compatibility
+        "power_5v_watts": total_watts if voltage == 5.0 else round(total_current_amps * 5.0, 2),
+        "actual_power_draw": actual_power_draw,
+        "heat_dissipation_watts": total_heat,
+        "efficiency": efficiency,
+        "recommended_supply_amps": recommended_supply_amps,
+        "recommended_supply_watts": recommended_supply_watts,
+        "max_operating_temp": led_spec["max_temp"],
+        "power_per_led_ma": power_per_led,
+        "power_density": round(total_watts / max(led_count, 1), 3)  # Watts per LED
     }
 
 
@@ -602,3 +750,244 @@ def validate_gpio_pin_availability(pin, exclude_pins=None):
         return False, "Pin number out of valid range (0-40)"
     
     return True, "Pin is available"
+
+
+def get_color_profile_settings(profile_name):
+    """Get predefined color profile settings"""
+    profiles = {
+        "standard": {
+            "color_temperature": 6500,
+            "gamma_correction": 2.2,
+            "white_balance": {"r": 1.0, "g": 1.0, "b": 1.0},
+            "color_balance": {"red": 1.0, "green": 1.0, "blue": 1.0}
+        },
+        "warm_white": {
+            "color_temperature": 3000,
+            "gamma_correction": 2.0,
+            "white_balance": {"r": 1.0, "g": 0.9, "b": 0.7},
+            "color_balance": {"red": 1.0, "green": 0.9, "blue": 0.7}
+        },
+        "cool_white": {
+            "color_temperature": 8000,
+            "gamma_correction": 2.4,
+            "white_balance": {"r": 0.9, "g": 1.0, "b": 1.0},
+            "color_balance": {"red": 0.9, "green": 1.0, "blue": 1.0}
+        },
+        "music_viz": {
+            "color_temperature": 6500,
+            "gamma_correction": 1.8,
+            "white_balance": {"r": 1.0, "g": 1.0, "b": 1.0},
+            "color_balance": {"red": 1.2, "green": 1.0, "blue": 1.1}
+        }
+    }
+    return profiles.get(profile_name, profiles["standard"])
+
+
+def get_performance_mode_settings(mode_name):
+    """Get predefined performance mode settings"""
+    modes = {
+        "quality": {
+            "update_rate": 60,
+            "dither_enabled": True,
+            "led_frequency": 800000,
+            "pwm_range": 4096
+        },
+        "balanced": {
+            "update_rate": 30,
+            "dither_enabled": True,
+            "led_frequency": 800000,
+            "pwm_range": 2048
+        },
+        "performance": {
+            "update_rate": 120,
+            "dither_enabled": False,
+            "led_frequency": 400000,
+            "pwm_range": 1024
+        }
+    }
+    return modes.get(mode_name, modes["balanced"])
+
+
+def save_configuration_profile(profile_name, config):
+    """Save a configuration as a named profile"""
+    try:
+        profiles_dir = CONFIG_DIR / "profiles"
+        profiles_dir.mkdir(exist_ok=True)
+        
+        profile_file = profiles_dir / f"{profile_name}.json"
+        
+        # Validate configuration before saving
+        validation_result = validate_config_comprehensive(config)
+        if not validation_result["valid"]:
+            logger.error(f"Cannot save invalid configuration profile: {validation_result['errors']}")
+            return False, validation_result["errors"]
+        
+        with open(profile_file, 'w') as f:
+            json.dump(config, f, indent=2)
+        
+        logger.info(f"Configuration profile '{profile_name}' saved")
+        return True, []
+    except Exception as e:
+        logger.error(f"Failed to save configuration profile: {e}")
+        return False, [str(e)]
+
+
+def load_configuration_profile(profile_name):
+    """Load a named configuration profile"""
+    try:
+        profiles_dir = CONFIG_DIR / "profiles"
+        profile_file = profiles_dir / f"{profile_name}.json"
+        
+        if not profile_file.exists():
+            logger.error(f"Configuration profile '{profile_name}' not found")
+            return None, ["Profile not found"]
+        
+        with open(profile_file, 'r') as f:
+            config = json.load(f)
+        
+        # Validate loaded configuration
+        validation_result = validate_config_comprehensive(config)
+        if not validation_result["valid"]:
+            logger.warning(f"Loaded profile has validation issues: {validation_result['warnings']}")
+        
+        logger.info(f"Configuration profile '{profile_name}' loaded")
+        return config, validation_result.get("warnings", [])
+    except Exception as e:
+        logger.error(f"Failed to load configuration profile: {e}")
+        return None, [str(e)]
+
+
+def list_configuration_profiles():
+    """List all available configuration profiles"""
+    try:
+        profiles_dir = CONFIG_DIR / "profiles"
+        if not profiles_dir.exists():
+            return []
+        
+        profiles = []
+        for profile_file in profiles_dir.glob("*.json"):
+            profile_name = profile_file.stem
+            stat = profile_file.stat()
+            profiles.append({
+                "name": profile_name,
+                "file": str(profile_file),
+                "modified": stat.st_mtime,
+                "size": stat.st_size
+            })
+        
+        return sorted(profiles, key=lambda x: x["modified"], reverse=True)
+    except Exception as e:
+        logger.error(f"Failed to list configuration profiles: {e}")
+        return []
+
+
+def delete_configuration_profile(profile_name):
+    """Delete a named configuration profile"""
+    try:
+        profiles_dir = CONFIG_DIR / "profiles"
+        profile_file = profiles_dir / f"{profile_name}.json"
+        
+        if not profile_file.exists():
+            logger.error(f"Configuration profile '{profile_name}' not found")
+            return False, "Profile not found"
+        
+        profile_file.unlink()
+        logger.info(f"Configuration profile '{profile_name}' deleted")
+        return True, "Profile deleted successfully"
+    except Exception as e:
+        logger.error(f"Failed to delete configuration profile: {e}")
+        return False, str(e)
+
+
+def detect_hardware_capabilities():
+    """Detect available hardware capabilities"""
+    capabilities = {
+        "gpio_available": False,
+        "spi_available": False,
+        "i2c_available": False,
+        "pwm_available": False,
+        "available_pins": [],
+        "led_strips_detected": [],
+        "power_supplies_detected": [],
+        "system_info": {}
+    }
+    
+    try:
+        # Try to detect GPIO availability
+        try:
+            import RPi.GPIO as GPIO
+            capabilities["gpio_available"] = True
+            
+            # Get available GPIO pins (excluding reserved ones)
+            reserved_pins = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14, 15, 16, 17, 30, 31]
+            power_ground_pins = [1, 2, 4, 6, 9, 14, 17, 20, 25, 30, 34, 39]
+            all_reserved = set(reserved_pins + power_ground_pins)
+            
+            capabilities["available_pins"] = [pin for pin in range(2, 28) if pin not in all_reserved]
+            
+        except ImportError:
+            logger.warning("RPi.GPIO not available - running on non-Raspberry Pi system")
+        except Exception as e:
+            logger.warning(f"GPIO detection failed: {e}")
+        
+        # Try to detect SPI availability
+        try:
+            import spidev
+            capabilities["spi_available"] = True
+        except ImportError:
+            pass
+        
+        # Try to detect I2C availability
+        try:
+            import smbus
+            capabilities["i2c_available"] = True
+        except ImportError:
+            pass
+        
+        # Try to detect PWM availability
+        try:
+            import pigpio
+            capabilities["pwm_available"] = True
+        except ImportError:
+            pass
+        
+        # Get system information
+        try:
+            import platform
+            import psutil
+            
+            capabilities["system_info"] = {
+                "platform": platform.platform(),
+                "processor": platform.processor(),
+                "architecture": platform.architecture()[0],
+                "python_version": platform.python_version(),
+                "memory_total": psutil.virtual_memory().total,
+                "memory_available": psutil.virtual_memory().available,
+                "cpu_count": psutil.cpu_count(),
+                "cpu_freq": psutil.cpu_freq().current if psutil.cpu_freq() else None
+            }
+        except ImportError:
+            pass
+        
+        logger.info("Hardware detection completed")
+        return capabilities
+        
+    except Exception as e:
+        logger.error(f"Hardware detection failed: {e}")
+        return capabilities
+
+
+def apply_color_profile(config, profile_name):
+    """Apply a color profile to the configuration"""
+    profile_settings = get_color_profile_settings(profile_name)
+    config.update(profile_settings)
+    config["color_profile"] = profile_name
+    return config
+
+
+def apply_performance_mode(config, mode_name):
+    """Apply a performance mode to the configuration"""
+    mode_settings = get_performance_mode_settings(mode_name)
+    config.update(mode_settings)
+    config["performance_mode"] = mode_name
+    return config

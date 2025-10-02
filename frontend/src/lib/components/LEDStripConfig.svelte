@@ -11,59 +11,122 @@
 		ledStripType: 'WS2811_STRIP_GRB',
 		powerSupplyVoltage: 5.0,
 		powerSupplyCurrent: 10.0,
-		brightness: 0.5
+		brightness: 0.5,
+		colorProfile: 'Standard RGB',
+		performanceMode: 'Balanced',
+		advancedSettings: {
+			gamma: 2.2,
+			whiteBalance: { r: 1.0, g: 1.0, b: 1.0 },
+			colorTemp: 6500,
+			dither: false,
+			updateRate: 30,
+			powerLimiting: true,
+			maxPowerWatts: 50,
+			thermalProtection: true,
+			maxTemp: 70
+		}
 	};
 	export let disabled = false;
 
+	// Enhanced LED types with more detailed specifications
 	const ledTypes = [
 		{
+			name: 'WS2812B',
 			value: 'WS2812B',
 			label: 'WS2812B',
-			description: 'Most common, integrated controller',
 			voltage: 5.0,
-			current_per_led: 60,
+			currentPerLED: 0.06,
 			frequency: 800000,
-			color_order: 'GRB'
+			colorOrder: 'GRB',
+			timing: { t0h: 0.4, t0l: 0.85, t1h: 0.8, t1l: 0.45, reset: 50 },
+			description: 'Standard addressable RGB LED'
 		},
 		{
-			value: 'WS2813',
-			label: 'WS2813',
-			description: 'Backup data line, more reliable',
-			voltage: 5.0,
-			current_per_led: 60,
-			frequency: 800000,
-			color_order: 'GRB'
+			name: 'WS2811',
+			value: 'WS2811',
+			label: 'WS2811',
+			voltage: 12.0,
+			currentPerLED: 0.06,
+			frequency: 400000,
+			colorOrder: 'RGB',
+			timing: { t0h: 0.5, t0l: 2.0, t1h: 1.2, t1l: 1.3, reset: 50 },
+			description: 'External driver chip, 12V operation'
 		},
 		{
+			name: 'SK6812',
+			value: 'SK6812',
+			label: 'SK6812',
+			voltage: 5.0,
+			currentPerLED: 0.06,
+			frequency: 800000,
+			colorOrder: 'GRB',
+			timing: { t0h: 0.3, t0l: 0.9, t1h: 0.6, t1l: 0.6, reset: 80 },
+			description: 'Similar to WS2812B with RGBW variants'
+		},
+		{
+			name: 'APA102',
+			value: 'APA102',
+			label: 'APA102',
+			voltage: 5.0,
+			currentPerLED: 0.06,
+			frequency: 1000000,
+			colorOrder: 'BGR',
+			timing: { clockBased: true },
+			description: 'Clock-based protocol, higher refresh rates'
+		},
+		{
+			name: 'WS2815',
 			value: 'WS2815',
 			label: 'WS2815',
-			description: '12V version, longer runs possible',
 			voltage: 12.0,
-			current_per_led: 20,
+			currentPerLED: 0.012,
 			frequency: 800000,
-			color_order: 'GRB'
-		},
-		{
-			value: 'APA102',
-			label: 'APA102 (DotStar)',
-			description: 'Clock + data, higher refresh rate',
-			voltage: 5.0,
-			current_per_led: 60,
-			frequency: 1000000,
-			color_order: 'BGR'
-		},
-		{
-			value: 'SK6812',
-			label: 'SK6812 (RGBW)',
-			description: 'RGB + White channel',
-			voltage: 5.0,
-			current_per_led: 80,
-			frequency: 800000,
-			color_order: 'GRBW'
+			colorOrder: 'GRB',
+			timing: { t0h: 0.3, t0l: 1.09, t1h: 1.09, t1l: 0.32, reset: 280 },
+			description: 'Dual signal, backup data line'
 		}
 	];
 
-	const colorOrders = {
+	// Color profiles for different applications
+	const colorProfiles = [
+		{
+			name: 'Standard RGB',
+			description: 'Standard sRGB color space',
+			gamma: 2.2,
+			whiteBalance: { r: 1.0, g: 1.0, b: 1.0 },
+			colorTemp: 6500
+		},
+		{
+			name: 'Warm White',
+			description: 'Warm white bias for cozy lighting',
+			gamma: 2.4,
+			whiteBalance: { r: 1.0, g: 0.9, b: 0.7 },
+			colorTemp: 3000
+		},
+		{
+			name: 'Cool White',
+			description: 'Cool white bias for task lighting',
+			gamma: 2.0,
+			whiteBalance: { r: 0.9, g: 1.0, b: 1.1 },
+			colorTemp: 8000
+		},
+		{
+			name: 'Music Visualization',
+			description: 'Enhanced colors for music reactive lighting',
+			gamma: 1.8,
+			whiteBalance: { r: 1.1, g: 1.0, b: 1.2 },
+			colorTemp: 6500
+		}
+	];
+
+	// Performance optimization options
+	const performanceOptions = [
+		{ name: 'Quality', description: 'Best color accuracy, higher CPU usage', dither: true, updateRate: 60 },
+		{ name: 'Balanced', description: 'Good balance of quality and performance', dither: false, updateRate: 30 },
+		{ name: 'Performance', description: 'Fastest updates, basic color processing', dither: false, updateRate: 120 }
+	];
+
+	const colorOrderToStripType = {
 		'GRB': 'WS2811_STRIP_GRB',
 		'RGB': 'WS2811_STRIP_RGB',
 		'BGR': 'WS2811_STRIP_BGR',
@@ -77,54 +140,71 @@
 	let powerCalculation = {};
 	let validationErrors = {};
 
+	// Enhanced power calculation with thermal considerations
 	function calculatePower() {
-		const selectedType = ledTypes.find(type => type.value === settings.ledType);
-		if (!selectedType) return;
+		const ledType = ledTypes.find(type => type.name === settings.ledType);
+		if (!ledType) return;
 
-		const totalCurrentMa = settings.ledCount * selectedType.current_per_led * settings.brightness;
-		const totalCurrentA = totalCurrentMa / 1000;
-		const totalWatts = totalCurrentA * selectedType.voltage;
-		const recommendedSupplyA = totalCurrentA * 1.2; // 20% safety margin
-		const recommendedSupplyW = recommendedSupplyA * selectedType.voltage;
-
-		// Voltage drop calculation (approximate)
-		const stripLengthM = settings.ledCount * 0.0167; // Assume 60 LEDs/meter
-		const voltageDrop = (totalCurrentA * stripLengthM * 0.1); // Rough estimate
-		const effectiveVoltage = selectedType.voltage - voltageDrop;
+		const brightnessMultiplier = settings.brightness;
+		const currentPerLED = ledType.currentPerLED * brightnessMultiplier;
+		const totalCurrent = settings.ledCount * currentPerLED;
+		const totalWattage = totalCurrent * ledType.voltage;
+		
+		// Wire resistance calculation (assuming 22 AWG wire)
+		const wireResistancePerMeter = 0.052; // ohms per meter for 22 AWG
+		const estimatedLength = settings.ledCount * 0.0167; // ~16.7mm per LED
+		const wireResistance = wireResistancePerMeter * estimatedLength;
+		const voltageDrop = totalCurrent * wireResistance;
+		const effectiveVoltage = settings.powerSupplyVoltage - voltageDrop;
+		
+		// Thermal calculations
+		const ambientTemp = 25; // °C
+		const thermalResistance = 50; // °C/W (estimated for LED strip)
+		const estimatedTemp = ambientTemp + (totalWattage * thermalResistance / 1000);
+		
+		// Power supply recommendations
+		const recommendedSupply = Math.ceil(totalWattage * 1.2); // 20% headroom
+		const supplyAdequacy = settings.powerSupplyCurrent * settings.powerSupplyVoltage >= totalWattage * 1.1;
+		const voltageAdequacy = effectiveVoltage >= ledType.voltage * 0.9;
+		const thermalOk = estimatedTemp <= (settings.advancedSettings?.maxTemp || 70);
 
 		powerCalculation = {
-			current_ma: Math.round(totalCurrentMa),
-			current_a: Math.round(totalCurrentA * 100) / 100,
-			power_watts: Math.round(totalWatts * 100) / 100,
-			recommended_supply_a: Math.round(recommendedSupplyA * 100) / 100,
-			recommended_supply_w: Math.round(recommendedSupplyW * 100) / 100,
-			strip_length_m: Math.round(stripLengthM * 100) / 100,
-			voltage_drop: Math.round(voltageDrop * 100) / 100,
-			effective_voltage: Math.round(effectiveVoltage * 100) / 100,
-			supply_adequate: settings.powerSupplyCurrent >= recommendedSupplyA,
-			voltage_adequate: effectiveVoltage >= (selectedType.voltage * 0.9)
+			current_a: totalCurrent.toFixed(2),
+			current_ma: (totalCurrent * 1000).toFixed(0),
+			power_watts: totalWattage.toFixed(1),
+			recommended_supply_a: (totalWattage * 1.2 / settings.powerSupplyVoltage).toFixed(2),
+			recommended_supply_w: recommendedSupply,
+			strip_length_m: (estimatedLength).toFixed(2),
+			voltage_drop: voltageDrop.toFixed(2),
+			effective_voltage: effectiveVoltage.toFixed(1),
+			estimated_temp: estimatedTemp.toFixed(1),
+			supply_adequate: supplyAdequacy,
+			voltage_adequate: voltageAdequacy,
+			thermal_ok: thermalOk,
+			efficiency: ((effectiveVoltage / ledType.voltage) * 100).toFixed(1)
 		};
 	}
 
+	// Enhanced validation with thermal and performance checks
 	function validateConfig() {
 		const errors = {};
-
+		
 		if (settings.ledCount <= 0) {
 			errors.ledCount = 'LED count must be greater than 0';
 		}
-
+		
 		if (settings.ledCount > settings.maxLedCount) {
 			errors.ledCount = `LED count cannot exceed ${settings.maxLedCount}`;
 		}
-
+		
 		if (settings.brightness < 0 || settings.brightness > 1) {
 			errors.brightness = 'Brightness must be between 0 and 1';
 		}
-
+		
 		if (settings.powerSupplyVoltage < 3 || settings.powerSupplyVoltage > 24) {
 			errors.powerSupplyVoltage = 'Voltage must be between 3V and 24V';
 		}
-
+		
 		if (settings.powerSupplyCurrent < 0.5 || settings.powerSupplyCurrent > 100) {
 			errors.powerSupplyCurrent = 'Current must be between 0.5A and 100A';
 		}
@@ -132,28 +212,20 @@
 		validationErrors = errors;
 	}
 
-	function handleConfigChange(key, value) {
-		settings = { ...settings, [key]: value };
-		
-		// Auto-update strip type when LED type changes
-		if (key === 'ledType') {
-			const selectedType = ledTypes.find(type => type.value === value);
-			if (selectedType) {
-				settings.ledStripType = colorOrders[selectedType.color_order];
-			}
-		}
-		
+	// Handle configuration changes
+	function handleConfigChange() {
 		calculatePower();
 		validateConfig();
-		dispatch('change', settings);
+		dispatch('configChange', settings);
 	}
 
-	function handleLEDCountInput(event) {
-		const value = parseInt(event.target.value) || 0;
-		handleConfigChange('ledCount', Math.min(value, settings.maxLedCount));
-	}
+	// Initialize calculations on component mount
+	onMount(() => {
+		calculatePower();
+		validateConfig();
+	});
 
-	// Initialize calculations
+	// Reactive calculations when settings change
 	$: if (settings) {
 		calculatePower();
 		validateConfig();
@@ -165,394 +237,533 @@
 </script>
 
 <div class="led-strip-config">
+	<h3>LED Strip Configuration</h3>
+	
+	<!-- LED Type Selection -->
 	<div class="config-section">
-		<h3>LED Strip Specification</h3>
+		<h4>LED Strip Type</h4>
+		<div class="config-row">
+			<label for="led-type">LED Type:</label>
+			<select 
+				id="led-type" 
+				bind:value={settings.ledType} 
+				on:change={handleConfigChange}
+				class:error={validationErrors.ledType}
+			>
+				{#each ledTypes as ledType}
+					<option value={ledType.value}>{ledType.label}</option>
+				{/each}
+			</select>
+			{#if validationErrors.ledType}
+				<div class="error-message">{validationErrors.ledType}</div>
+			{/if}
+		</div>
 		
-		<div class="strip-basic-config">
-			<div class="config-group">
-				<label for="led-type">LED Strip Type</label>
-				<select
-					id="led-type"
-					bind:value={settings.ledType}
-				on:change={(e) => handleConfigChange('ledType', e.target.value)}
-					{disabled}
+		<!-- LED Type Specifications -->
+		{#if settings.ledType}
+			{@const selectedType = ledTypes.find(type => type.value === settings.ledType)}
+			{#if selectedType}
+				<div class="led-specs">
+					<div class="spec-item">
+						<span class="spec-label">Voltage:</span>
+						<span class="spec-value">{selectedType.voltage}V</span>
+					</div>
+					<div class="spec-item">
+						<span class="spec-label">Current per LED:</span>
+						<span class="spec-value">{selectedType.currentPerLED * 1000}mA</span>
+					</div>
+					<div class="spec-item">
+						<span class="spec-label">Frequency:</span>
+						<span class="spec-value">{selectedType.frequency}</span>
+					</div>
+					<div class="spec-item">
+						<span class="spec-label">Color Order:</span>
+						<span class="spec-value">{selectedType.colorOrder}</span>
+					</div>
+				</div>
+			{/if}
+		{/if}
+	</div>
+
+	<!-- LED Count -->
+	<div class="config-section">
+		<div class="config-row">
+			<label for="led-count">Number of LEDs:</label>
+			<input 
+				id="led-count" 
+				type="number" 
+				min="1" 
+				max={settings.maxLedCount}
+				bind:value={settings.ledCount} 
+				on:input={handleConfigChange}
+				class:error={validationErrors.ledCount}
+			>
+			<span class="input-hint">Max: {settings.maxLedCount}</span>
+			{#if validationErrors.ledCount}
+				<div class="error-message">{validationErrors.ledCount}</div>
+			{/if}
+		</div>
+	</div>
+
+	<!-- LED Configuration -->
+	<div class="config-section">
+		<h4>LED Configuration</h4>
+		
+		<div class="config-row">
+			<label for="orientation">LED Orientation:</label>
+			<select 
+				id="orientation" 
+				bind:value={settings.orientation} 
+				on:change={handleConfigChange}
+			>
+				<option value="normal">Normal (Start to End)</option>
+				<option value="reversed">Reversed (End to Start)</option>
+			</select>
+		</div>
+
+		<div class="config-row">
+			<label for="brightness">Default Brightness:</label>
+			<div class="brightness-control">
+				<input 
+					id="brightness" 
+					type="range" 
+					min="0" 
+					max="1" 
+					step="0.01"
+					bind:value={settings.brightness} 
+					on:input={handleConfigChange}
+					class:error={validationErrors.brightness}
 				>
-					{#each ledTypes as type}
-						<option value={type.value}>{type.label} - {type.description}</option>
-					{/each}
-				</select>
-				{#if selectedLEDType}
-					<div class="type-specs">
-						<span>Voltage: {selectedLEDType.voltage}V</span>
-						<span>Current: {selectedLEDType.current_per_led}mA/LED</span>
-						<span>Order: {selectedLEDType.color_order}</span>
+				<span class="brightness-value">{Math.round(settings.brightness * 100)}%</span>
+			</div>
+			{#if validationErrors.brightness}
+				<div class="error-message">{validationErrors.brightness}</div>
+			{/if}
+		</div>
+	</div>
+
+	<!-- Power Supply Configuration -->
+	<div class="config-section">
+		<h4>Power Supply</h4>
+		
+		<div class="config-row">
+			<label for="supply-voltage">Supply Voltage (V):</label>
+			<input 
+				id="supply-voltage" 
+				type="number" 
+				min="3" 
+				max="24" 
+				step="0.1"
+				bind:value={settings.powerSupplyVoltage} 
+				on:input={handleConfigChange}
+				class:error={validationErrors.powerSupplyVoltage}
+			>
+			{#if validationErrors.powerSupplyVoltage}
+				<div class="error-message">{validationErrors.powerSupplyVoltage}</div>
+			{/if}
+		</div>
+
+		<div class="config-row">
+			<label for="supply-current">Supply Current Capacity (A):</label>
+			<input 
+				id="supply-current" 
+				type="number" 
+				min="0.5" 
+				max="100" 
+				step="0.1"
+				bind:value={settings.powerSupplyCurrent} 
+				on:input={handleConfigChange}
+				class:error={validationErrors.powerSupplyCurrent}
+			>
+			{#if validationErrors.powerSupplyCurrent}
+				<div class="error-message">{validationErrors.powerSupplyCurrent}</div>
+			{/if}
+		</div>
+	</div>
+
+	<!-- Power Analysis -->
+	{#if powerCalculation && Object.keys(powerCalculation).length > 0}
+		<div class="config-section">
+			<h4>Power Analysis</h4>
+			<div class="power-analysis">
+				<div class="power-grid">
+					<div class="power-item">
+						<span class="power-label">Current Draw:</span>
+						<span class="power-value">{powerCalculation.current_a}A ({powerCalculation.current_ma}mA)</span>
+					</div>
+					<div class="power-item">
+						<span class="power-label">Power Consumption:</span>
+						<span class="power-value">{powerCalculation.power_watts}W</span>
+					</div>
+					<div class="power-item">
+						<span class="power-label">Recommended Supply:</span>
+						<span class="power-value">{powerCalculation.recommended_supply_a}A ({powerCalculation.recommended_supply_w}W)</span>
+					</div>
+					<div class="power-item">
+						<span class="power-label">Strip Length:</span>
+						<span class="power-value">{powerCalculation.strip_length_m}m</span>
+					</div>
+					<div class="power-item">
+						<span class="power-label">Voltage Drop:</span>
+						<span class="power-value">{powerCalculation.voltage_drop}V</span>
+					</div>
+					<div class="power-item">
+						<span class="power-label">Effective Voltage:</span>
+						<span class="power-value">{powerCalculation.effective_voltage}V</span>
+					</div>
+					<div class="power-item">
+						<span class="power-label">Estimated Temperature:</span>
+						<span class="power-value">{powerCalculation.estimated_temp}°C</span>
+					</div>
+					<div class="power-item">
+						<span class="power-label">Efficiency:</span>
+						<span class="power-value">{powerCalculation.efficiency}%</span>
+					</div>
+				</div>
+
+				<!-- Status Indicators -->
+				<div class="status-indicators">
+					<div class="status-item" class:warning={!powerCalculation.supply_adequate}>
+						<span class="status-icon">{powerCalculation.supply_adequate ? '✓' : '⚠'}</span>
+						<span class="status-text">
+							{powerCalculation.supply_adequate ? 'Power Supply Adequate' : 'Power Supply Insufficient'}
+						</span>
+					</div>
+					<div class="status-item" class:warning={!powerCalculation.voltage_adequate}>
+						<span class="status-icon">{powerCalculation.voltage_adequate ? '✓' : '⚠'}</span>
+						<span class="status-text">
+							{powerCalculation.voltage_adequate ? 'Voltage Level Good' : 'Voltage Drop Too High'}
+						</span>
+					</div>
+					<div class="status-item" class:warning={!powerCalculation.thermal_ok}>
+						<span class="status-icon">{powerCalculation.thermal_ok ? '✓' : '⚠'}</span>
+						<span class="status-text">
+							{powerCalculation.thermal_ok ? 'Temperature Safe' : 'Temperature Too High'}
+						</span>
+					</div>
+				</div>
+
+				<!-- Recommendations -->
+				{#if !powerCalculation.supply_adequate || !powerCalculation.voltage_adequate || !powerCalculation.thermal_ok}
+					<div class="recommendations">
+						<h5>Recommendations:</h5>
+						<ul>
+							{#if !powerCalculation.supply_adequate}
+								<li>Increase power supply capacity to at least {powerCalculation.recommended_supply_a}A</li>
+							{/if}
+							{#if !powerCalculation.voltage_adequate}
+								<li>Use thicker wire gauge or shorter cable runs to reduce voltage drop</li>
+								<li>Consider using a higher supply voltage if supported</li>
+							{/if}
+							{#if !powerCalculation.thermal_ok}
+								<li>Reduce brightness or LED count to lower power consumption</li>
+								<li>Improve ventilation or add heat sinks</li>
+							{/if}
+						</ul>
 					</div>
 				{/if}
 			</div>
-
-			<div class="config-group">
-				<label for="led-count">Number of LEDs</label>
-				<div class="led-count-input">
-					<input
-						id="led-count"
-						type="number"
-						min="1"
-						max={settings.maxLedCount}
-				bind:value={settings.ledCount}
-				on:input={handleLEDCountInput}
-				{disabled}
-				class:error={validationErrors.ledCount}
-			/>
-			<span class="max-indicator">/ {settings.maxLedCount} max</span>
-		</div>
-		{#if validationErrors.ledCount}
-			<span class="error-message">{validationErrors.ledCount}</span>
-				{/if}
-			</div>
-
-			<div class="config-group">
-				<label for="led-orientation">LED Orientation</label>
-				<select
-					id="led-orientation"
-					bind:value={settings.ledOrientation}
-				on:change={(e) => handleConfigChange('ledOrientation', e.target.value)}
-					{disabled}
-				>
-					<option value="normal">Normal (Left to Right)</option>
-					<option value="reversed">Reversed (Right to Left)</option>
-				</select>
-			</div>
-
-			<div class="config-group">
-				<label for="brightness">Default Brightness</label>
-				<div class="brightness-control">
-					<input
-						id="brightness"
-						type="range"
-						min="0"
-						max="1"
-						step="0.01"
-						bind:value={settings.brightness}
-						on:input={(e) => handleConfigChange('brightness', parseFloat(e.target.value))}
-						{disabled}
-						class:error={validationErrors.brightness}
-					/>
-					<span class="brightness-value">{Math.round(settings.brightness * 100)}%</span>
-				</div>
-				{#if validationErrors.brightness}
-					<span class="error-message">{validationErrors.brightness}</span>
-				{/if}
-			</div>
-		</div>
-	</div>
-
-	<div class="power-section">
-		<h3>Power Supply Configuration</h3>
-		
-		<div class="power-config">
-			<div class="config-group">
-				<label for="supply-voltage">Supply Voltage (V)</label>
-				<input
-					id="supply-voltage"
-					type="number"
-					min="3"
-					max="24"
-					step="0.1"
-					bind:value={settings.powerSupplyVoltage}
-				on:input={(e) => handleConfigChange('powerSupplyVoltage', parseFloat(e.target.value))}
-				{disabled}
-				class:error={validationErrors.powerSupplyVoltage}
-			/>
-			{#if validationErrors.powerSupplyVoltage}
-				<span class="error-message">{validationErrors.powerSupplyVoltage}</span>
-				{/if}
-			</div>
-
-			<div class="config-group">
-				<label for="supply-current">Supply Current Capacity (A)</label>
-				<input
-					id="supply-current"
-					type="number"
-					min="0.5"
-					max="100"
-					step="0.1"
-					bind:value={settings.powerSupplyCurrent}
-				on:input={(e) => handleConfigChange('powerSupplyCurrent', parseFloat(e.target.value))}
-				{disabled}
-				class:error={validationErrors.powerSupplyCurrent}
-			/>
-			{#if validationErrors.powerSupplyCurrent}
-				<span class="error-message">{validationErrors.powerSupplyCurrent}</span>
-				{/if}
-			</div>
-		</div>
-	</div>
-
-	{#if powerCalculation.current_a}
-		<div class="power-analysis" class:warning={powerWarnings}>
-			<h4>Power Analysis</h4>
-			
-			<div class="analysis-grid">
-				<div class="analysis-item">
-					<span class="label">Current Draw:</span>
-					<span class="value">{powerCalculation.current_a}A ({powerCalculation.current_ma}mA)</span>
-				</div>
-				
-				<div class="analysis-item">
-					<span class="label">Power Consumption:</span>
-					<span class="value">{powerCalculation.power_watts}W</span>
-				</div>
-				
-				<div class="analysis-item">
-					<span class="label">Recommended Supply:</span>
-					<span class="value">{powerCalculation.recommended_supply_a}A ({powerCalculation.recommended_supply_w}W)</span>
-				</div>
-				
-				<div class="analysis-item">
-					<span class="label">Strip Length:</span>
-					<span class="value">{powerCalculation.strip_length_m}m (estimated)</span>
-				</div>
-				
-				<div class="analysis-item">
-					<span class="label">Voltage Drop:</span>
-					<span class="value">{powerCalculation.voltage_drop}V</span>
-				</div>
-				
-				<div class="analysis-item">
-					<span class="label">Effective Voltage:</span>
-					<span class="value">{powerCalculation.effective_voltage}V</span>
-				</div>
-			</div>
-
-			<div class="power-status">
-				<div class="status-item" class:good={powerCalculation.supply_adequate} class:bad={!powerCalculation.supply_adequate}>
-					<span class="status-icon">{powerCalculation.supply_adequate ? '✅' : '⚠️'}</span>
-					<span>Power Supply {powerCalculation.supply_adequate ? 'Adequate' : 'Insufficient'}</span>
-				</div>
-				
-				<div class="status-item" class:good={powerCalculation.voltage_adequate} class:bad={!powerCalculation.voltage_adequate}>
-					<span class="status-icon">{powerCalculation.voltage_adequate ? '✅' : '⚠️'}</span>
-					<span>Voltage Level {powerCalculation.voltage_adequate ? 'Adequate' : 'Too Low'}</span>
-				</div>
-			</div>
-
-			{#if !powerCalculation.supply_adequate}
-				<div class="recommendation">
-					<strong>Recommendation:</strong> Increase power supply capacity to at least {powerCalculation.recommended_supply_a}A
-					or reduce LED count/brightness.
-				</div>
-			{/if}
-
-			{#if !powerCalculation.voltage_adequate}
-				<div class="recommendation">
-					<strong>Recommendation:</strong> Consider power injection every 100-150 LEDs or use higher voltage strips (WS2815).
-				</div>
-			{/if}
 		</div>
 	{/if}
 </div>
 
 <style>
 	.led-strip-config {
-		display: flex;
-		flex-direction: column;
-		gap: 1.5rem;
-		padding: 1rem;
-		border: 1px solid #e0e0e0;
+		background: var(--surface-color);
 		border-radius: 8px;
-		background: #fafafa;
+		padding: 1.5rem;
+		border: 1px solid var(--border-color);
 	}
 
-	.config-section h3 {
-		margin: 0 0 1rem 0;
-		color: #333;
-		font-size: 1.2rem;
+	.led-strip-config h3 {
+		margin: 0 0 1.5rem 0;
+		color: var(--text-primary);
+		font-size: 1.25rem;
 		font-weight: 600;
 	}
 
-	.strip-basic-config, .power-config {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-		gap: 1rem;
-		padding: 1rem;
-		background: white;
-		border-radius: 6px;
-		border: 1px solid #e0e0e0;
+	.config-section {
+		margin-bottom: 2rem;
 	}
 
-	.config-group {
+	.config-section:last-child {
+		margin-bottom: 0;
+	}
+
+	.config-section h4 {
+		margin: 0 0 1rem 0;
+		color: var(--text-primary);
+		font-size: 1.1rem;
+		font-weight: 500;
+		border-bottom: 1px solid var(--border-color);
+		padding-bottom: 0.5rem;
+	}
+
+	.config-row {
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
+		margin-bottom: 1rem;
 	}
 
-	.config-group label {
+	.config-row label {
 		font-weight: 500;
-		color: #333;
+		color: var(--text-primary);
 		font-size: 0.9rem;
 	}
 
-	.config-group input, .config-group select {
+	.config-row select,
+	.config-row input[type="number"] {
 		padding: 0.5rem;
-		border: 1px solid #ddd;
+		border: 1px solid var(--border-color);
 		border-radius: 4px;
-		background: white;
+		background: var(--input-bg);
+		color: var(--text-primary);
 		font-size: 0.9rem;
 	}
 
-	.config-group input.error, .config-group select.error {
-		border-color: #dc3545;
-		box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.1);
+	.config-row select:focus,
+	.config-row input:focus {
+		outline: none;
+		border-color: var(--accent-color);
+		box-shadow: 0 0 0 2px var(--accent-color-alpha);
 	}
 
-	.error-message {
-		color: #dc3545;
-		font-size: 0.8rem;
-		font-weight: 500;
+	.config-row .error {
+		border-color: var(--error-color);
 	}
 
-	.type-specs {
-		display: flex;
-		gap: 0.75rem;
-		flex-wrap: wrap;
+	.input-hint {
 		font-size: 0.8rem;
-		color: #666;
+		color: var(--text-secondary);
 		margin-top: 0.25rem;
 	}
 
-	.type-specs span {
-		padding: 0.2rem 0.4rem;
-		background: #f0f8ff;
-		border-radius: 3px;
-		color: #0066cc;
-	}
-
-	.led-count-input {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.led-count-input input {
-		flex: 1;
-	}
-
-	.max-indicator {
+	.error-message {
+		color: var(--error-color);
 		font-size: 0.8rem;
-		color: #666;
-		white-space: nowrap;
+		margin-top: 0.25rem;
 	}
 
+	/* LED Specifications */
+	.led-specs {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+		gap: 0.75rem;
+		margin-top: 1rem;
+		padding: 1rem;
+		background: var(--surface-secondary);
+		border-radius: 6px;
+		border: 1px solid var(--border-color);
+	}
+
+	.spec-item {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+
+	.spec-label {
+		font-size: 0.85rem;
+		color: var(--text-secondary);
+	}
+
+	.spec-value {
+		font-size: 0.85rem;
+		color: var(--text-primary);
+		font-weight: 500;
+	}
+
+	/* Brightness Control */
 	.brightness-control {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
+		gap: 1rem;
 	}
 
 	.brightness-control input[type="range"] {
 		flex: 1;
+		height: 6px;
+		background: var(--surface-secondary);
+		border-radius: 3px;
+		outline: none;
+		-webkit-appearance: none;
+	}
+
+	.brightness-control input[type="range"]::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		width: 18px;
+		height: 18px;
+		background: var(--accent-color);
+		border-radius: 50%;
+		cursor: pointer;
+	}
+
+	.brightness-control input[type="range"]::-moz-range-thumb {
+		width: 18px;
+		height: 18px;
+		background: var(--accent-color);
+		border-radius: 50%;
+		cursor: pointer;
+		border: none;
 	}
 
 	.brightness-value {
-		font-weight: 600;
-		color: #333;
+		font-weight: 500;
+		color: var(--text-primary);
 		min-width: 40px;
 		text-align: right;
 	}
 
+	/* Power Analysis */
 	.power-analysis {
-		padding: 1rem;
-		background: white;
+		background: var(--surface-secondary);
 		border-radius: 6px;
-		border: 1px solid #e0e0e0;
+		padding: 1.5rem;
+		border: 1px solid var(--border-color);
 	}
 
-	.power-analysis.warning {
-		border-color: #ffc107;
-		background: #fff8e1;
-	}
-
-	.power-analysis h4 {
-		margin: 0 0 1rem 0;
-		color: #333;
-		font-size: 1rem;
-		font-weight: 600;
-	}
-
-	.analysis-grid {
+	.power-grid {
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-		gap: 0.75rem;
-		margin-bottom: 1rem;
+		gap: 1rem;
+		margin-bottom: 1.5rem;
 	}
 
-	.analysis-item {
+	.power-item {
 		display: flex;
 		justify-content: space-between;
-		padding: 0.5rem;
-		background: #f8f9fa;
+		align-items: center;
+		padding: 0.75rem;
+		background: var(--surface-color);
 		border-radius: 4px;
+		border: 1px solid var(--border-color);
 	}
 
-	.analysis-item .label {
+	.power-label {
+		font-size: 0.9rem;
+		color: var(--text-secondary);
+	}
+
+	.power-value {
+		font-size: 0.9rem;
+		color: var(--text-primary);
 		font-weight: 500;
-		color: #666;
 	}
 
-	.analysis-item .value {
-		font-weight: 600;
-		color: #333;
-	}
-
-	.power-status {
+	/* Status Indicators */
+	.status-indicators {
 		display: flex;
-		gap: 1rem;
-		margin-bottom: 1rem;
-		flex-wrap: wrap;
+		flex-direction: column;
+		gap: 0.75rem;
+		margin-bottom: 1.5rem;
 	}
 
 	.status-item {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
-		padding: 0.5rem 0.75rem;
-		border-radius: 4px;
-		font-weight: 500;
-	}
-
-	.status-item.good {
-		background: #d4edda;
-		color: #155724;
-		border: 1px solid #c3e6cb;
-	}
-
-	.status-item.bad {
-		background: #f8d7da;
-		color: #721c24;
-		border: 1px solid #f5c6cb;
-	}
-
-	.recommendation {
+		gap: 0.75rem;
 		padding: 0.75rem;
-		background: #fff3cd;
-		border: 1px solid #ffeaa7;
+		background: var(--surface-color);
 		border-radius: 4px;
-		color: #856404;
-		font-size: 0.9rem;
+		border: 1px solid var(--border-color);
 	}
 
+	.status-item.warning {
+		background: var(--warning-bg);
+		border-color: var(--warning-color);
+	}
+
+	.status-icon {
+		font-size: 1.1rem;
+		font-weight: bold;
+	}
+
+	.status-item:not(.warning) .status-icon {
+		color: var(--success-color);
+	}
+
+	.status-item.warning .status-icon {
+		color: var(--warning-color);
+	}
+
+	.status-text {
+		font-size: 0.9rem;
+		color: var(--text-primary);
+	}
+
+	/* Recommendations */
+	.recommendations {
+		background: var(--info-bg);
+		border: 1px solid var(--info-color);
+		border-radius: 4px;
+		padding: 1rem;
+	}
+
+	.recommendations h5 {
+		margin: 0 0 0.75rem 0;
+		color: var(--info-color);
+		font-size: 0.95rem;
+		font-weight: 600;
+	}
+
+	.recommendations ul {
+		margin: 0;
+		padding-left: 1.25rem;
+	}
+
+	.recommendations li {
+		color: var(--text-primary);
+		font-size: 0.85rem;
+		margin-bottom: 0.5rem;
+	}
+
+	.recommendations li:last-child {
+		margin-bottom: 0;
+	}
+
+	/* Responsive Design */
 	@media (max-width: 768px) {
-		.strip-basic-config, .power-config, .analysis-grid {
+		.led-strip-config {
+			padding: 1rem;
+		}
+
+		.led-specs {
 			grid-template-columns: 1fr;
 		}
-		
-		.power-status {
-			flex-direction: column;
+
+		.power-grid {
+			grid-template-columns: 1fr;
 		}
-		
+
 		.brightness-control {
 			flex-direction: column;
 			align-items: stretch;
+			gap: 0.5rem;
+		}
+
+		.brightness-value {
+			text-align: center;
+		}
+
+		.status-indicators {
+			gap: 0.5rem;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.config-row {
+			gap: 0.25rem;
+		}
+
+		.power-item {
+			flex-direction: column;
+			align-items: stretch;
+			gap: 0.5rem;
+		}
+
+		.power-item .power-label {
+			font-weight: 500;
 		}
 	}
 </style>

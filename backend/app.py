@@ -419,7 +419,9 @@ def get_performance_metrics():
 
 # Register settings API blueprint
 from api.settings import settings_bp
+from api.hardware_test import hardware_test_bp
 app.register_blueprint(settings_bp, url_prefix='/api/settings')
+app.register_blueprint(hardware_test_bp)
 
 @app.route('/api/test-hardware', methods=['POST'])
 def test_hardware():
