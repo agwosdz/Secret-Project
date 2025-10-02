@@ -1,5 +1,5 @@
 <script>
-	import { createEventDispatcher } from 'svelte';
+	import { createEventDispatcher, onMount } from 'svelte';
 	import SettingsFormField from './SettingsFormField.svelte';
 	import { createCategoryValidation } from '../utils/settingsValidation.js';
 
