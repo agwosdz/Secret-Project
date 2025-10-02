@@ -123,8 +123,11 @@
 		const ledCount = ledState.length;
 		const availableWidth = actualWidth - (ledSpacing * 2);
 		const ledWidth = (availableWidth - (ledSpacing * (ledCount - 1))) / ledCount;
-		const ledSize = Math.min(ledWidth, ledRadius * 2);
+		const ledSize = Math.max(1, Math.min(ledWidth, ledRadius * 2)); // Ensure minimum size of 1
 		const ledY = actualHeight / 2;
+
+		// Skip rendering if ledSize is too small or invalid
+		if (ledSize <= 0 || !isFinite(ledSize)) return;
 
 		// Render background strip
 		ctx.fillStyle = '#1a1a1a';
