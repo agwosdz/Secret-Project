@@ -59,7 +59,10 @@
 
   onMount(async () => {
     // Connect to WebSocket
-    socket = io('http://localhost:5001');
+    const backendHost = import.meta.env.VITE_BACKEND_HOST || window.location.hostname;
+    const backendPort = import.meta.env.VITE_BACKEND_PORT || '5001';
+    const socketUrl = `http://${backendHost}:${backendPort}`;
+    socket = io(socketUrl);
     
     socket.on('connect', () => {
       isConnected = true;
