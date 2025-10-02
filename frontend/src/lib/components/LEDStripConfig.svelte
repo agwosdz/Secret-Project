@@ -29,12 +29,12 @@
 		}
 	};
 	// Initialize validation for LED settings
-	const { validationState, validateField, clearValidation } = createCategoryValidation('led');
+	const categoryValidation = createCategoryValidation('led');
 
 	// Validate individual field with proper category and field mapping
 	async function validateFieldMapped(field, value) {
 		const mappedField = fieldMapping[field] || field;
-		return await validateField(mappedField, value);
+		return await categoryValidation.validateField(mappedField, value);
 	}
 	
 	// Map frontend field names to backend schema field names
@@ -281,8 +281,8 @@
 			bind:value={settings.ledType}
 			options={ledTypes.map(type => ({ value: type.value, label: type.label }))}
 			{disabled}
-			validationState={$validationState.strip_type?.state}
-			error={$validationState.strip_type?.error}
+			validationState={$categoryValidation.errors?.strip_type ? 'invalid' : 'valid'}
+			error={$categoryValidation.errors?.strip_type}
 			helpText="Select the type of LED strip you're using"
 			on:change={(e) => handleConfigChange('ledType', e.detail)}
 		/>
@@ -317,16 +317,15 @@
 	<div class="config-section">
 		<SettingsFormField
 			type="number"
-			label="Number of LEDs"
+			label="LED Count"
 			id="led-count"
 			bind:value={settings.ledCount}
 			min="1"
-			max={settings.maxLedCount}
+			max="1000"
 			{disabled}
-			validationState={$validationState.count?.state}
-			error={$validationState.count?.error}
-			helpText={`Maximum: ${settings.maxLedCount} LEDs`}
-			on:input={(e) => handleInput('ledCount', e.detail)}
+			validationState={$categoryValidation.errors?.count ? 'invalid' : 'valid'}
+			error={$categoryValidation.errors?.count}
+			helpText="Number of LEDs in your strip (1-1000)"
 			on:change={(e) => handleConfigChange('ledCount', e.detail)}
 		/>
 	</div>
@@ -345,25 +344,24 @@
 				{ value: 'reversed', label: 'Reversed (End to Start)' }
 			]}
 			{disabled}
-			validationState={$validationState.reverse_order?.state}
-			error={$validationState.reverse_order?.error}
-			helpText="Direction of LED data flow"
+			validationState={$categoryValidation.errors?.reverse_order ? 'invalid' : 'valid'}
+			error={$categoryValidation.errors?.reverse_order}
+			helpText="Reverse the order of LEDs if your strip is wired backwards"
 			on:change={(e) => handleConfigChange('ledOrientation', e.detail)}
 		/>
 
 		<SettingsFormField
 			type="range"
-			label="Default Brightness"
+			label="Brightness"
 			id="brightness"
 			bind:value={settings.brightness}
 			min="0"
-			max="1"
-			step="0.01"
+			max="100"
+			step="1"
 			{disabled}
-			validationState={$validationState.brightness?.state}
-			error={$validationState.brightness?.error}
-			helpText={`Current: ${Math.round(settings.brightness * 100)}%`}
-			on:input={(e) => handleInput('brightness', e.detail)}
+			validationState={$categoryValidation.errors?.brightness ? 'invalid' : 'valid'}
+			error={$categoryValidation.errors?.brightness}
+			helpText="Overall brightness level (0-100%)"
 			on:change={(e) => handleConfigChange('brightness', e.detail)}
 		/>
 	</div>
@@ -381,8 +379,8 @@
 			max="24"
 			step="0.1"
 			{disabled}
-			validationState={$validationState.powerSupplyVoltage?.state}
-			error={$validationState.powerSupplyVoltage?.error}
+			validationState={$categoryValidation.errors?.powerSupplyVoltage ? 'invalid' : 'valid'}
+			error={$categoryValidation.errors?.powerSupplyVoltage}
 			helpText="Voltage rating of your power supply (3V - 24V)"
 			on:input={(e) => handleInput('powerSupplyVoltage', e.detail)}
 			on:change={(e) => handleConfigChange('powerSupplyVoltage', e.detail)}
@@ -393,13 +391,13 @@
 			label="Supply Current Capacity (A)"
 			id="supply-current"
 			bind:value={settings.powerSupplyCurrent}
-			min="0.5"
+			min="0.1"
 			max="100"
 			step="0.1"
 			{disabled}
-			validationState={$validationState.powerSupplyCurrent?.state}
-			error={$validationState.powerSupplyCurrent?.error}
-			helpText="Maximum current capacity of your power supply (0.5A - 100A)"
+			validationState={$categoryValidation.errors?.powerSupplyCurrent ? 'invalid' : 'valid'}
+			error={$categoryValidation.errors?.powerSupplyCurrent}
+			helpText="Maximum current capacity of your power supply (A)"
 			on:input={(e) => handleInput('powerSupplyCurrent', e.detail)}
 			on:change={(e) => handleConfigChange('powerSupplyCurrent', e.detail)}
 		/>
@@ -420,8 +418,8 @@
 				description: profile.description 
 			}))}
 			{disabled}
-			validationState={$validationState.colorProfile?.state}
-			error={$validationState.colorProfile?.error}
+			validationState={$categoryValidation.errors?.colorProfile ? 'invalid' : 'valid'}
+			error={$categoryValidation.errors?.colorProfile}
 			helpText="Color profile affects gamma, white balance, and color temperature"
 			on:change={(e) => handleConfigChange('colorProfile', e.detail)}
 		/>
@@ -437,8 +435,8 @@
 				description: option.description 
 			}))}
 			{disabled}
-			validationState={$validationState.performanceMode?.state}
-			error={$validationState.performanceMode?.error}
+			validationState={$categoryValidation.errors?.performanceMode ? 'invalid' : 'valid'}
+			error={$categoryValidation.errors?.performanceMode}
 			helpText="Performance mode affects dithering and update rate"
 			on:change={(e) => handleConfigChange('performanceMode', e.detail)}
 		/>
@@ -447,13 +445,13 @@
 			type="number"
 			label="Gamma Correction"
 			id="gamma"
-			bind:value={settings.advancedSettings.gamma}
+			bind:value={settings.gamma}
 			min="1.0"
 			max="3.0"
 			step="0.1"
 			{disabled}
-			validationState={$validationState.gamma_correction?.state}
-			error={$validationState.gamma_correction?.error}
+			validationState={$categoryValidation.errors?.gamma_correction ? 'invalid' : 'valid'}
+			error={$categoryValidation.errors?.gamma_correction}
 			helpText="Gamma correction for color accuracy (1.0 - 3.0)"
 			on:input={(e) => handleInput('gamma', e.detail)}
 			on:change={(e) => handleConfigChange('gamma', e.detail)}
@@ -463,14 +461,14 @@
 			type="number"
 			label="Color Temperature (K)"
 			id="color-temp"
-			bind:value={settings.advancedSettings.colorTemp}
-			min="2000"
-			max="10000"
+			bind:value={settings.colorTemp}
+			min="2700"
+			max="6500"
 			step="100"
 			{disabled}
-			validationState={$validationState.color_temperature?.state}
-			error={$validationState.color_temperature?.error}
-			helpText="Color temperature in Kelvin (2000K - 10000K)"
+			validationState={$categoryValidation.errors?.color_temperature ? 'invalid' : 'valid'}
+			error={$categoryValidation.errors?.color_temperature}
+			helpText="White balance color temperature (2700K-6500K)"
 			on:input={(e) => handleInput('colorTemp', e.detail)}
 			on:change={(e) => handleConfigChange('colorTemp', e.detail)}
 		/>
@@ -479,30 +477,28 @@
 			type="number"
 			label="Update Rate (Hz)"
 			id="update-rate"
-			bind:value={settings.advancedSettings.updateRate}
-			min="10"
+			bind:value={settings.updateRate}
+			min="1"
 			max="120"
-			step="1"
 			{disabled}
-			validationState={$validationState.updateRate?.state}
-			error={$validationState.updateRate?.error}
-			helpText="LED update frequency in Hz (10 - 120)"
+			validationState={$categoryValidation.errors?.updateRate ? 'invalid' : 'valid'}
+			error={$categoryValidation.errors?.updateRate}
+			helpText="LED update rate in Hz (1-120)"
 			on:input={(e) => handleInput('updateRate', e.detail)}
 			on:change={(e) => handleConfigChange('updateRate', e.detail)}
 		/>
 
 		<SettingsFormField
 			type="number"
-			label="Max Power Limit (W)"
+			label="Max Power (Watts)"
 			id="max-power"
-			bind:value={settings.advancedSettings.maxPowerWatts}
+			bind:value={settings.maxPowerWatts}
 			min="1"
 			max="1000"
-			step="1"
 			{disabled}
-			validationState={$validationState.maxPowerWatts?.state}
-			error={$validationState.maxPowerWatts?.error}
-			helpText="Maximum power consumption limit in watts"
+			validationState={$categoryValidation.errors?.maxPowerWatts ? 'invalid' : 'valid'}
+			error={$categoryValidation.errors?.maxPowerWatts}
+			helpText="Maximum power consumption limit"
 			on:input={(e) => handleInput('maxPowerWatts', e.detail)}
 			on:change={(e) => handleConfigChange('maxPowerWatts', e.detail)}
 		/>
@@ -511,14 +507,13 @@
 			type="number"
 			label="Max Temperature (°C)"
 			id="max-temp"
-			bind:value={settings.advancedSettings.maxTemp}
+			bind:value={settings.maxTemp}
 			min="40"
 			max="100"
-			step="1"
 			{disabled}
-			validationState={$validationState.maxTemp?.state}
-			error={$validationState.maxTemp?.error}
-			helpText="Maximum operating temperature in Celsius"
+			validationState={$categoryValidation.errors?.maxTemp ? 'invalid' : 'valid'}
+			error={$categoryValidation.errors?.maxTemp}
+			helpText="Maximum operating temperature"
 			on:input={(e) => handleInput('maxTemp', e.detail)}
 			on:change={(e) => handleConfigChange('maxTemp', e.detail)}
 		/>
@@ -527,11 +522,11 @@
 			type="checkbox"
 			label="Enable Dithering"
 			id="dither"
-			bind:value={settings.advancedSettings.dither}
+			bind:value={settings.dither}
 			{disabled}
-			validationState={$validationState.dither?.state}
-			error={$validationState.dither?.error}
-			helpText="Dithering improves color accuracy but increases CPU usage"
+			validationState={$categoryValidation.errors?.dither ? 'invalid' : 'valid'}
+			error={$categoryValidation.errors?.dither}
+			helpText="Improve color accuracy with dithering"
 			on:change={(e) => handleConfigChange('dither', e.detail)}
 		/>
 
@@ -539,11 +534,11 @@
 			type="checkbox"
 			label="Power Limiting"
 			id="power-limiting"
-			bind:value={settings.advancedSettings.powerLimiting}
+			bind:value={settings.powerLimiting}
 			{disabled}
-			validationState={$validationState.powerLimiting?.state}
-			error={$validationState.powerLimiting?.error}
-			helpText="Automatically limit brightness to stay within power budget"
+			validationState={$categoryValidation.errors?.powerLimiting ? 'invalid' : 'valid'}
+			error={$categoryValidation.errors?.powerLimiting}
+			helpText="Automatically limit power consumption"
 			on:change={(e) => handleConfigChange('powerLimiting', e.detail)}
 		/>
 
@@ -551,11 +546,11 @@
 			type="checkbox"
 			label="Thermal Protection"
 			id="thermal-protection"
-			bind:value={settings.advancedSettings.thermalProtection}
+			bind:value={settings.thermalProtection}
 			{disabled}
-			validationState={$validationState.thermalProtection?.state}
-			error={$validationState.thermalProtection?.error}
-			helpText="Automatically reduce brightness if temperature exceeds limit"
+			validationState={$categoryValidation.errors?.thermalProtection ? 'invalid' : 'valid'}
+			error={$categoryValidation.errors?.thermalProtection}
+			helpText="Enable thermal protection to prevent overheating"
 			on:change={(e) => handleConfigChange('thermalProtection', e.detail)}
 		/>
 	</div>

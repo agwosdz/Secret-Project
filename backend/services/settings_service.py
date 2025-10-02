@@ -96,15 +96,37 @@ class SettingsService:
         """Get the default settings schema with types and constraints."""
         return {
             'audio': {
+                'enabled': {'type': 'boolean', 'default': False},
+                'volume': {'type': 'number', 'default': 50, 'min': 0, 'max': 100},
                 'inputDevice': {'type': 'string', 'default': 'default'},
                 'gain': {'type': 'number', 'default': 1.0, 'min': 0, 'max': 2.0},
                 'latencyMs': {'type': 'number', 'default': 50, 'min': 0, 'max': 500},
                 'sampleRate': {'type': 'number', 'default': 44100},
                 'bufferSize': {'type': 'number', 'default': 1024}
             },
+            'piano': {
+                'enabled': {'type': 'boolean', 'default': False},
+                'octave': {'type': 'number', 'default': 4, 'min': 0, 'max': 8},
+                'velocity_sensitivity': {'type': 'number', 'default': 64, 'min': 0, 'max': 127},
+                'channel': {'type': 'number', 'default': 1, 'min': 1, 'max': 16}
+            },
+            'gpio': {
+                'enabled': {'type': 'boolean', 'default': False},
+                'pins': {'type': 'array', 'default': []},
+                'debounce_time': {'type': 'number', 'default': 50, 'min': 0, 'max': 1000}
+            },
             'led': {
+                'enabled': {'type': 'boolean', 'default': False},
+                'count': {'type': 'number', 'default': 88, 'min': 1, 'max': 1000},
+                'brightness': {'type': 'number', 'default': 50, 'min': 0, 'max': 100},
+                'strip_type': {'type': 'string', 'default': 'WS2812B', 'enum': ['WS2812B', 'WS2811', 'APA102', 'SK6812']},
+                'data_pin': {'type': 'number', 'default': 18, 'min': 1, 'max': 40},
+                'clock_pin': {'type': 'number', 'default': 19, 'min': 1, 'max': 40},
+                'reverse_order': {'type': 'boolean', 'default': False},
+                'color_mode': {'type': 'string', 'default': 'velocity', 'enum': ['rainbow', 'velocity', 'note', 'custom']},
+                'color_temperature': {'type': 'number', 'default': 6500, 'min': 2000, 'max': 10000},
+                'gamma_correction': {'type': 'number', 'default': 2.2, 'min': 1.0, 'max': 3.0},
                 'colorScheme': {'type': 'string', 'default': 'rainbow'},
-                'brightness': {'type': 'number', 'default': 0.8, 'min': 0, 'max': 1.0},
                 'animationSpeed': {'type': 'number', 'default': 1.0, 'min': 0.1, 'max': 3.0},
                 'ledCount': {'type': 'number', 'default': 246, 'min': 1, 'max': 300},
                 'gpioPin': {'type': 'number', 'default': 19},
@@ -112,14 +134,29 @@ class SettingsService:
                 'ledType': {'type': 'string', 'default': 'WS2812B'},
                 'gammaCorrection': {'type': 'number', 'default': 2.2, 'min': 1.0, 'max': 3.0}
             },
+            'hardware': {
+                'auto_detect_midi': {'type': 'boolean', 'default': True},
+                'auto_detect_gpio': {'type': 'boolean', 'default': True},
+                'auto_detect_led': {'type': 'boolean', 'default': True},
+                'midi_device_id': {'type': 'string', 'default': ''},
+                'rtpmidi_enabled': {'type': 'boolean', 'default': False},
+                'rtpmidi_port': {'type': 'number', 'default': 5004, 'min': 1024, 'max': 65535}
+            },
             'system': {
-                'theme': {'type': 'string', 'default': 'dark', 'enum': ['light', 'dark', 'auto']},
+                'theme': {'type': 'string', 'default': 'auto', 'enum': ['light', 'dark', 'auto']},
+                'debug': {'type': 'boolean', 'default': False},
+                'log_level': {'type': 'string', 'default': 'info', 'enum': ['debug', 'info', 'warn', 'error']},
+                'auto_save': {'type': 'boolean', 'default': True},
+                'backup_settings': {'type': 'boolean', 'default': True},
                 'performanceMode': {'type': 'string', 'default': 'balanced', 'enum': ['power_save', 'balanced', 'performance']},
                 'autoSave': {'type': 'boolean', 'default': True},
                 'debugMode': {'type': 'boolean', 'default': False},
                 'logLevel': {'type': 'string', 'default': 'INFO', 'enum': ['DEBUG', 'INFO', 'WARNING', 'ERROR']}
             },
             'user': {
+                'name': {'type': 'string', 'default': 'User'},
+                'email': {'type': 'string', 'default': ''},
+                'preferences': {'type': 'object', 'default': {}},
                 'favoriteSchemes': {'type': 'array', 'default': []},
                 'recentConfigs': {'type': 'array', 'default': []},
                 'lastUsedDevice': {'type': 'string', 'default': ''},
