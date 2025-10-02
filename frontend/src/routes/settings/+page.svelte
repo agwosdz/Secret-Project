@@ -8,6 +8,8 @@
 	import LEDTestSequence from '$lib/components/LEDTestSequence.svelte';
 	import ConfigurationManager from '$lib/components/ConfigurationManager.svelte';
 	import DashboardControls from '$lib/components/DashboardControls.svelte';
+	import SettingsSection from '$lib/components/SettingsSection.svelte';
+	import SettingsValidationMessage from '$lib/components/SettingsValidationMessage.svelte';
 
 	// Component state
 	let message = '';
@@ -163,11 +165,14 @@ function showMessage(text, type) {
 			<p class="text-gray-600">Configure your piano LED system hardware and settings</p>
 		</div>
 
-		{#if message}
-			<div class="mx-6 mt-4 p-4 rounded-md {messageType === 'success' ? 'bg-green-100 text-green-700 border border-green-300' : messageType === 'error' ? 'bg-red-100 text-red-700 border border-red-300' : 'bg-blue-100 text-blue-700 border border-blue-300'}">
-				{message}
-			</div>
-		{/if}
+		<div class="mx-6 mt-4">
+			<SettingsValidationMessage 
+				type={messageType} 
+				message={message} 
+				dismissible={true}
+				on:dismiss={() => message = ''}
+			/>
+		</div>
 
 		<!-- Tab Navigation -->
 		<div class="border-b border-gray-200">
@@ -185,45 +190,77 @@ function showMessage(text, type) {
 		</div>
 
 		<!-- Tab Content -->
-		<div class="p-6">
+		<div class="p-6 space-y-6">
 			{#if activeTab === 'piano'}
-				<PianoKeyboardSelector 
-					settings={{
-						piano: {
-							size: currentSettings.piano_size || '88-key',
-							keys: currentSettings.piano_keys || 88,
-							octaves: currentSettings.piano_octaves || 7,
-							startNote: currentSettings.piano_start_note || 'A0',
-							endNote: currentSettings.piano_end_note || 'C8',
-							keyMapping: currentSettings.key_mapping_mode || 'chromatic'
-						},
-						led: {
-							ledCount: currentSettings.led_count || 246,
-							ledOrientation: currentSettings.led_orientation || 'normal'
-						}
-					}}
-					on:change={(e) => handleSettingsChange(e.detail)}
-				/>
+				<SettingsSection
+					title="Piano Configuration"
+					description="Configure your piano keyboard settings and key mapping"
+					icon="🎹"
+					loading={loading}
+					error={error}
+					hasUnsavedChanges={hasUnsavedChanges}
+					on:save={() => saveSettings()}
+					on:reset={() => resetSettings()}
+				>
+					<PianoKeyboardSelector 
+						settings={{
+							piano: {
+								size: currentSettings.piano_size || '88-key',
+								keys: currentSettings.piano_keys || 88,
+								octaves: currentSettings.piano_octaves || 7,
+								startNote: currentSettings.piano_start_note || 'A0',
+								endNote: currentSettings.piano_end_note || 'C8',
+								keyMapping: currentSettings.key_mapping_mode || 'chromatic'
+							},
+							led: {
+								ledCount: currentSettings.led_count || 246,
+								ledOrientation: currentSettings.led_orientation || 'normal'
+							}
+						}}
+						on:change={(e) => handleSettingsChange(e.detail)}
+					/>
+				</SettingsSection>
 			{:else if activeTab === 'gpio'}
-				<GPIOConfigPanel 
-					settings={{
-						gpio_pin: currentSettings.gpio_pin || 19,
-						gpio_power_pin: currentSettings.gpio_power_pin || null,
-						gpio_ground_pin: currentSettings.gpio_ground_pin || null,
-						signal_level: currentSettings.signal_level || 3.3,
-						led_frequency: currentSettings.led_frequency || 800000,
-						dma_channel: currentSettings.dma_channel || 10,
-						auto_detect_hardware: currentSettings.auto_detect_hardware || false,
-						validate_gpio_pins: currentSettings.validate_gpio_pins || true,
-						hardware_test_enabled: currentSettings.hardware_test_enabled || false,
-						gpio_pull_up: currentSettings.gpio_pull_up || [],
-						gpio_pull_down: currentSettings.gpio_pull_down || [],
-						pwm_range: currentSettings.pwm_range || 4096,
-						spi_speed: currentSettings.spi_speed || 8000000
-					}}
-					on:change={(e) => handleSettingsChange(e.detail)}
-				/>
+				<SettingsSection
+					title="GPIO Configuration"
+					description="Configure GPIO pins and hardware settings for LED control"
+					icon="🔌"
+					loading={loading}
+					error={error}
+					hasUnsavedChanges={hasUnsavedChanges}
+					on:save={() => saveSettings()}
+					on:reset={() => resetSettings()}
+				>
+					<GPIOConfigPanel 
+						settings={{
+							gpio_pin: currentSettings.gpio_pin || 19,
+							gpio_power_pin: currentSettings.gpio_power_pin || null,
+							gpio_ground_pin: currentSettings.gpio_ground_pin || null,
+							signal_level: currentSettings.signal_level || 3.3,
+							led_frequency: currentSettings.led_frequency || 800000,
+							dma_channel: currentSettings.dma_channel || 10,
+							auto_detect_hardware: currentSettings.auto_detect_hardware || false,
+							validate_gpio_pins: currentSettings.validate_gpio_pins || true,
+							hardware_test_enabled: currentSettings.hardware_test_enabled || false,
+							gpio_pull_up: currentSettings.gpio_pull_up || [],
+							gpio_pull_down: currentSettings.gpio_pull_down || [],
+							pwm_range: currentSettings.pwm_range || 4096,
+							spi_speed: currentSettings.spi_speed || 8000000
+						}}
+						on:change={(e) => handleSettingsChange(e.detail)}
+					/>
+				</SettingsSection>
 			{:else if activeTab === 'led'}
+				<SettingsSection
+					title="LED Strip Configuration"
+					description="Configure LED strip settings, power management, and visual effects"
+					icon="💡"
+					loading={loading}
+					error={error}
+					hasUnsavedChanges={hasUnsavedChanges}
+					on:save={() => saveSettings()}
+					on:reset={() => resetSettings()}
+				>
 				<LEDStripConfig 
 					settings={{
 						ledCount: currentSettings.led_count || 246,
@@ -250,35 +287,64 @@ function showMessage(text, type) {
 					}}
 					on:configChange={(e) => handleLEDSettingsChange(e.detail)}
 				/>
+				</SettingsSection>
 			{:else if activeTab === 'test'}
-				<div class="led-test-container">
-					<LEDTestSequence 
+				<SettingsSection
+					title="LED Testing & Diagnostics"
+					description="Test LED functionality and run diagnostic sequences"
+					icon="🧪"
+					loading={loading}
+					error={error}
+					showActions={false}
+				>
+					<div class="led-test-container">
+						<LEDTestSequence 
+							bind:settings={currentSettings}
+							on:change={(e) => handleSettingsChange(e.detail)}
+						/>
+						
+						<!-- Manual LED Control Section -->
+						<div class="manual-control-section">
+							<h3 class="text-lg font-medium text-gray-900 mb-4">Manual LED Control</h3>
+							<p class="text-sm text-gray-600 mb-6">Test individual LEDs and patterns for troubleshooting and validation.</p>
+							
+							<div class="manual-controls-wrapper">
+								<DashboardControls 
+									connected={true}
+									ledCount={currentSettings.led?.ledCount || 246}
+									on:ledTest={(e) => console.log('LED Test:', e.detail)}
+									on:patternTest={(e) => console.log('Pattern Test:', e.detail)}
+									on:ledCountChange={(e) => console.log('LED Count Change:', e.detail)}
+								/>
+							</div>
+						</div>
+					</div>
+				</SettingsSection>
+			{:else if activeTab === 'config'}
+				<SettingsSection
+					title="Configuration Management"
+					description="Import, export, and manage configuration presets"
+					icon="📁"
+					loading={loading}
+					error={error}
+					showActions={false}
+				>
+					<ConfigurationManager 
 						bind:settings={currentSettings}
 						on:change={(e) => handleSettingsChange(e.detail)}
 					/>
-					
-					<!-- Manual LED Control Section -->
-					<div class="manual-control-section">
-						<h3 class="text-lg font-medium text-gray-900 mb-4">Manual LED Control</h3>
-						<p class="text-sm text-gray-600 mb-6">Test individual LEDs and patterns for troubleshooting and validation.</p>
-						
-						<div class="manual-controls-wrapper">
-							<DashboardControls 
-								connected={true}
-								ledCount={currentSettings.led?.ledCount || 246}
-								on:ledTest={(e) => console.log('LED Test:', e.detail)}
-								on:patternTest={(e) => console.log('Pattern Test:', e.detail)}
-								on:ledCountChange={(e) => console.log('LED Count Change:', e.detail)}
-							/>
-						</div>
-					</div>
-				</div>
-			{:else if activeTab === 'config'}
-				<ConfigurationManager 
-					bind:settings={currentSettings}
-					on:change={(e) => handleSettingsChange(e.detail)}
-				/>
+				</SettingsSection>
 			{:else if activeTab === 'advanced'}
+				<SettingsSection
+					title="Advanced Settings"
+					description="Fine-tune color correction, gamma, and performance settings"
+					icon="⚙️"
+					loading={loading}
+					error={error}
+					hasUnsavedChanges={hasUnsavedChanges}
+					on:save={() => saveSettings()}
+					on:reset={() => resetSettings()}
+				>
 				<div class="space-y-6">
 					<h3 class="text-lg font-medium text-gray-900">Advanced Settings</h3>
 					
@@ -366,6 +432,22 @@ function showMessage(text, type) {
 						</div>
 					</div>
 				</div>
+				</SettingsSection>
+			{:else if activeTab === 'mapping'}
+				<SettingsSection
+					title="Key Mapping Configuration"
+					description="Configure how piano keys map to LED positions"
+					icon="🗂️"
+					loading={loading}
+					error={error}
+					hasUnsavedChanges={hasUnsavedChanges}
+					on:save={() => saveSettings()}
+					on:reset={() => resetSettings()}
+				>
+					<div class="space-y-6">
+						<p class="text-gray-600">Key mapping configuration will be available in a future update.</p>
+					</div>
+				</SettingsSection>
 			{/if}
 		</div>
 

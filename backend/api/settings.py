@@ -7,6 +7,7 @@ Provides RESTful API access to the centralized settings service
 import logging
 from flask import Blueprint, request, jsonify
 from typing import Dict, Any
+from schemas.settings_schema import validate_setting, validate_category, validate_all_settings, get_all_defaults
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,15 @@ def set_setting(category, key):
                 'message': 'Request must include "value" field'
             }), 400
         
+        # Validate the setting using schema
+        try:
+            validate_setting(category, key, data['value'])
+        except ValueError as e:
+            return jsonify({
+                'error': 'Validation Error',
+                'message': str(e)
+            }), 400
+        
         settings_service = get_settings_service()
         success = settings_service.set_setting(category, key, data['value'])
         if not success:
@@ -108,6 +118,15 @@ def update_multiple_settings():
             return jsonify({
                 'error': 'Bad Request',
                 'message': 'No settings data provided'
+            }), 400
+        
+        # Validate all settings using schema
+        try:
+            validate_all_settings(data)
+        except ValueError as e:
+            return jsonify({
+                'error': 'Validation Error',
+                'message': str(e)
             }), 400
         
         settings_service = get_settings_service()
@@ -170,6 +189,15 @@ def import_settings():
                 'message': 'No settings data provided'
             }), 400
         
+        # Validate imported settings using schema
+        try:
+            validate_all_settings(data)
+        except ValueError as e:
+            return jsonify({
+                'error': 'Validation Error',
+                'message': f'Invalid settings data: {str(e)}'
+            }), 400
+        
         settings_service = get_settings_service()
         success = settings_service.import_settings(data)
         if not success:
@@ -188,7 +216,7 @@ def import_settings():
 
 @settings_bp.route('/validate', methods=['POST'])
 def validate_settings():
-    """Validate settings data"""
+    """Validate settings data using schema"""
     try:
         data = request.get_json()
         if not data:
@@ -197,13 +225,18 @@ def validate_settings():
                 'message': 'No settings data provided'
             }), 400
         
-        settings_service = get_settings_service()
-        is_valid, errors = settings_service.validate_settings(data)
-        
-        return jsonify({
-            'valid': is_valid,
-            'errors': errors
-        }), 200
+        # Use schema validation
+        try:
+            validate_all_settings(data)
+            return jsonify({
+                'valid': True,
+                'message': 'All settings are valid'
+            }), 200
+        except ValueError as e:
+            return jsonify({
+                'valid': False,
+                'errors': [str(e)]
+            }), 200
     except Exception as e:
         logger.error(f"Error validating settings: {e}")
         return jsonify({
@@ -215,8 +248,8 @@ def validate_settings():
 def get_settings_schema():
     """Get the settings schema"""
     try:
-        settings_service = get_settings_service()
-        schema = settings_service.get_schema()
+        from schemas.settings_schema import SettingsSchema
+        schema = SettingsSchema.SCHEMA
         return jsonify(schema), 200
     except Exception as e:
         logger.error(f"Error getting schema: {e}")

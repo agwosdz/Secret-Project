@@ -1,5 +1,7 @@
 <script>
 	import { createEventDispatcher } from 'svelte';
+	import SettingsFormField from './SettingsFormField.svelte';
+	import { createCategoryValidation } from '../utils/settingsValidation.js';
 
 	const dispatch = createEventDispatcher();
 
@@ -26,6 +28,9 @@
 			maxTemp: 70
 		}
 	};
+	// Initialize validation for LED settings
+	const { validationState, validateField, clearValidation } = createCategoryValidation('led');
+
 	export let disabled = false;
 
 	// Enhanced LED types with more detailed specifications
@@ -212,11 +217,21 @@
 		validationErrors = errors;
 	}
 
-	// Handle configuration changes
-	function handleConfigChange() {
+	// Handle configuration changes with validation
+	function handleConfigChange(field, value) {
+		if (field && value !== undefined) {
+			settings[field] = value;
+			validateField(field, value);
+		}
 		calculatePower();
 		validateConfig();
 		dispatch('configChange', settings);
+	}
+
+	// Handle input changes for real-time validation
+	function handleInput(field, value) {
+		settings[field] = value;
+		validateField(field, value);
 	}
 
 	// Initialize calculations on component mount
@@ -242,22 +257,19 @@
 	<!-- LED Type Selection -->
 	<div class="config-section">
 		<h4>LED Strip Type</h4>
-		<div class="config-row">
-			<label for="led-type">LED Type:</label>
-			<select 
-				id="led-type" 
-				bind:value={settings.ledType} 
-				on:change={handleConfigChange}
-				class:error={validationErrors.ledType}
-			>
-				{#each ledTypes as ledType}
-					<option value={ledType.value}>{ledType.label}</option>
-				{/each}
-			</select>
-			{#if validationErrors.ledType}
-				<div class="error-message">{validationErrors.ledType}</div>
-			{/if}
-		</div>
+		
+		<SettingsFormField
+			type="select"
+			label="LED Type"
+			id="led-type"
+			bind:value={settings.ledType}
+			options={ledTypes.map(type => ({ value: type.value, label: type.label }))}
+			{disabled}
+			validationState={$validationState.ledType?.state}
+			error={$validationState.ledType?.error}
+			helpText="Select the type of LED strip you're using"
+			on:change={(e) => handleConfigChange('ledType', e.detail)}
+		/>
 		
 		<!-- LED Type Specifications -->
 		{#if settings.ledType}
@@ -287,98 +299,249 @@
 
 	<!-- LED Count -->
 	<div class="config-section">
-		<div class="config-row">
-			<label for="led-count">Number of LEDs:</label>
-			<input 
-				id="led-count" 
-				type="number" 
-				min="1" 
-				max={settings.maxLedCount}
-				bind:value={settings.ledCount} 
-				on:input={handleConfigChange}
-				class:error={validationErrors.ledCount}
-			>
-			<span class="input-hint">Max: {settings.maxLedCount}</span>
-			{#if validationErrors.ledCount}
-				<div class="error-message">{validationErrors.ledCount}</div>
-			{/if}
-		</div>
+		<SettingsFormField
+			type="number"
+			label="Number of LEDs"
+			id="led-count"
+			bind:value={settings.ledCount}
+			min="1"
+			max={settings.maxLedCount}
+			{disabled}
+			validationState={$validationState.ledCount?.state}
+			error={$validationState.ledCount?.error}
+			helpText={`Maximum: ${settings.maxLedCount} LEDs`}
+			on:input={(e) => handleInput('ledCount', e.detail)}
+			on:change={(e) => handleConfigChange('ledCount', e.detail)}
+		/>
 	</div>
 
 	<!-- LED Configuration -->
 	<div class="config-section">
 		<h4>LED Configuration</h4>
 		
-		<div class="config-row">
-			<label for="orientation">LED Orientation:</label>
-			<select 
-				id="orientation" 
-				bind:value={settings.orientation} 
-				on:change={handleConfigChange}
-			>
-				<option value="normal">Normal (Start to End)</option>
-				<option value="reversed">Reversed (End to Start)</option>
-			</select>
-		</div>
+		<SettingsFormField
+			type="select"
+			label="LED Orientation"
+			id="orientation"
+			bind:value={settings.ledOrientation}
+			options={[
+				{ value: 'normal', label: 'Normal (Start to End)' },
+				{ value: 'reversed', label: 'Reversed (End to Start)' }
+			]}
+			{disabled}
+			validationState={$validationState.ledOrientation?.state}
+			error={$validationState.ledOrientation?.error}
+			helpText="Direction of LED data flow"
+			on:change={(e) => handleConfigChange('ledOrientation', e.detail)}
+		/>
 
-		<div class="config-row">
-			<label for="brightness">Default Brightness:</label>
-			<div class="brightness-control">
-				<input 
-					id="brightness" 
-					type="range" 
-					min="0" 
-					max="1" 
-					step="0.01"
-					bind:value={settings.brightness} 
-					on:input={handleConfigChange}
-					class:error={validationErrors.brightness}
-				>
-				<span class="brightness-value">{Math.round(settings.brightness * 100)}%</span>
-			</div>
-			{#if validationErrors.brightness}
-				<div class="error-message">{validationErrors.brightness}</div>
-			{/if}
-		</div>
+		<SettingsFormField
+			type="range"
+			label="Default Brightness"
+			id="brightness"
+			bind:value={settings.brightness}
+			min="0"
+			max="1"
+			step="0.01"
+			{disabled}
+			validationState={$validationState.brightness?.state}
+			error={$validationState.brightness?.error}
+			helpText={`Current: ${Math.round(settings.brightness * 100)}%`}
+			on:input={(e) => handleInput('brightness', e.detail)}
+			on:change={(e) => handleConfigChange('brightness', e.detail)}
+		/>
 	</div>
 
 	<!-- Power Supply Configuration -->
 	<div class="config-section">
 		<h4>Power Supply</h4>
 		
-		<div class="config-row">
-			<label for="supply-voltage">Supply Voltage (V):</label>
-			<input 
-				id="supply-voltage" 
-				type="number" 
-				min="3" 
-				max="24" 
-				step="0.1"
-				bind:value={settings.powerSupplyVoltage} 
-				on:input={handleConfigChange}
-				class:error={validationErrors.powerSupplyVoltage}
-			>
-			{#if validationErrors.powerSupplyVoltage}
-				<div class="error-message">{validationErrors.powerSupplyVoltage}</div>
-			{/if}
-		</div>
+		<SettingsFormField
+			type="number"
+			label="Supply Voltage (V)"
+			id="supply-voltage"
+			bind:value={settings.powerSupplyVoltage}
+			min="3"
+			max="24"
+			step="0.1"
+			{disabled}
+			validationState={$validationState.powerSupplyVoltage?.state}
+			error={$validationState.powerSupplyVoltage?.error}
+			helpText="Voltage rating of your power supply (3V - 24V)"
+			on:input={(e) => handleInput('powerSupplyVoltage', e.detail)}
+			on:change={(e) => handleConfigChange('powerSupplyVoltage', e.detail)}
+		/>
 
-		<div class="config-row">
-			<label for="supply-current">Supply Current Capacity (A):</label>
-			<input 
-				id="supply-current" 
-				type="number" 
-				min="0.5" 
-				max="100" 
-				step="0.1"
-				bind:value={settings.powerSupplyCurrent} 
-				on:input={handleConfigChange}
-				class:error={validationErrors.powerSupplyCurrent}
-			>
-			{#if validationErrors.powerSupplyCurrent}
-				<div class="error-message">{validationErrors.powerSupplyCurrent}</div>
-			{/if}
-		</div>
+		<SettingsFormField
+			type="number"
+			label="Supply Current Capacity (A)"
+			id="supply-current"
+			bind:value={settings.powerSupplyCurrent}
+			min="0.5"
+			max="100"
+			step="0.1"
+			{disabled}
+			validationState={$validationState.powerSupplyCurrent?.state}
+			error={$validationState.powerSupplyCurrent?.error}
+			helpText="Maximum current capacity of your power supply (0.5A - 100A)"
+			on:input={(e) => handleInput('powerSupplyCurrent', e.detail)}
+			on:change={(e) => handleConfigChange('powerSupplyCurrent', e.detail)}
+		/>
+	</div>
+
+	<!-- Advanced Settings -->
+	<div class="config-section">
+		<h4>Advanced Settings</h4>
+		
+		<SettingsFormField
+			type="select"
+			label="Color Profile"
+			id="color-profile"
+			bind:value={settings.colorProfile}
+			options={colorProfiles.map(profile => ({ 
+				value: profile.name, 
+				label: profile.name,
+				description: profile.description 
+			}))}
+			{disabled}
+			validationState={$validationState.colorProfile?.state}
+			error={$validationState.colorProfile?.error}
+			helpText="Color profile affects gamma, white balance, and color temperature"
+			on:change={(e) => handleConfigChange('colorProfile', e.detail)}
+		/>
+
+		<SettingsFormField
+			type="select"
+			label="Performance Mode"
+			id="performance-mode"
+			bind:value={settings.performanceMode}
+			options={performanceOptions.map(option => ({ 
+				value: option.name, 
+				label: option.name,
+				description: option.description 
+			}))}
+			{disabled}
+			validationState={$validationState.performanceMode?.state}
+			error={$validationState.performanceMode?.error}
+			helpText="Performance mode affects dithering and update rate"
+			on:change={(e) => handleConfigChange('performanceMode', e.detail)}
+		/>
+
+		<SettingsFormField
+			type="number"
+			label="Gamma Correction"
+			id="gamma"
+			bind:value={settings.advancedSettings.gamma}
+			min="1.0"
+			max="3.0"
+			step="0.1"
+			{disabled}
+			validationState={$validationState.gamma?.state}
+			error={$validationState.gamma?.error}
+			helpText="Gamma correction for color accuracy (1.0 - 3.0)"
+			on:input={(e) => handleInput('gamma', e.detail)}
+			on:change={(e) => handleConfigChange('gamma', e.detail)}
+		/>
+
+		<SettingsFormField
+			type="number"
+			label="Color Temperature (K)"
+			id="color-temp"
+			bind:value={settings.advancedSettings.colorTemp}
+			min="2000"
+			max="10000"
+			step="100"
+			{disabled}
+			validationState={$validationState.colorTemp?.state}
+			error={$validationState.colorTemp?.error}
+			helpText="Color temperature in Kelvin (2000K - 10000K)"
+			on:input={(e) => handleInput('colorTemp', e.detail)}
+			on:change={(e) => handleConfigChange('colorTemp', e.detail)}
+		/>
+
+		<SettingsFormField
+			type="number"
+			label="Update Rate (Hz)"
+			id="update-rate"
+			bind:value={settings.advancedSettings.updateRate}
+			min="10"
+			max="120"
+			step="1"
+			{disabled}
+			validationState={$validationState.updateRate?.state}
+			error={$validationState.updateRate?.error}
+			helpText="LED update frequency in Hz (10 - 120)"
+			on:input={(e) => handleInput('updateRate', e.detail)}
+			on:change={(e) => handleConfigChange('updateRate', e.detail)}
+		/>
+
+		<SettingsFormField
+			type="number"
+			label="Max Power Limit (W)"
+			id="max-power"
+			bind:value={settings.advancedSettings.maxPowerWatts}
+			min="1"
+			max="1000"
+			step="1"
+			{disabled}
+			validationState={$validationState.maxPowerWatts?.state}
+			error={$validationState.maxPowerWatts?.error}
+			helpText="Maximum power consumption limit in watts"
+			on:input={(e) => handleInput('maxPowerWatts', e.detail)}
+			on:change={(e) => handleConfigChange('maxPowerWatts', e.detail)}
+		/>
+
+		<SettingsFormField
+			type="number"
+			label="Max Temperature (°C)"
+			id="max-temp"
+			bind:value={settings.advancedSettings.maxTemp}
+			min="40"
+			max="100"
+			step="1"
+			{disabled}
+			validationState={$validationState.maxTemp?.state}
+			error={$validationState.maxTemp?.error}
+			helpText="Maximum operating temperature in Celsius"
+			on:input={(e) => handleInput('maxTemp', e.detail)}
+			on:change={(e) => handleConfigChange('maxTemp', e.detail)}
+		/>
+
+		<SettingsFormField
+			type="checkbox"
+			label="Enable Dithering"
+			id="dither"
+			bind:value={settings.advancedSettings.dither}
+			{disabled}
+			validationState={$validationState.dither?.state}
+			error={$validationState.dither?.error}
+			helpText="Dithering improves color accuracy but increases CPU usage"
+			on:change={(e) => handleConfigChange('dither', e.detail)}
+		/>
+
+		<SettingsFormField
+			type="checkbox"
+			label="Power Limiting"
+			id="power-limiting"
+			bind:value={settings.advancedSettings.powerLimiting}
+			{disabled}
+			validationState={$validationState.powerLimiting?.state}
+			error={$validationState.powerLimiting?.error}
+			helpText="Automatically limit brightness to stay within power budget"
+			on:change={(e) => handleConfigChange('powerLimiting', e.detail)}
+		/>
+
+		<SettingsFormField
+			type="checkbox"
+			label="Thermal Protection"
+			id="thermal-protection"
+			bind:value={settings.advancedSettings.thermalProtection}
+			{disabled}
+			validationState={$validationState.thermalProtection?.state}
+			error={$validationState.thermalProtection?.error}
+			helpText="Automatically reduce brightness if temperature exceeds limit"
+			on:change={(e) => handleConfigChange('thermalProtection', e.detail)}
+		/>
 	</div>
 
 	<!-- Power Analysis -->
