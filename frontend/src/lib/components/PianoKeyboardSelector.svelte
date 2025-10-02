@@ -216,7 +216,7 @@
 			<h3 class="section-title">Visual Key-to-LED Mapping Preview</h3>
 			<div class="keyboard-container">
 				<div class="keyboard-wrapper">
-					<div class="keyboard" style="width: 400px; height: 120px; position: relative;">
+					<div class="keyboard" style="height: 120px; position: relative;">
 						{#each keyboardKeys as key}
 							<div
 								class="key"
@@ -423,6 +423,9 @@
 		background: #f8f8f8;
 		overflow: visible;
 		box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+		width: 100%;
+		min-width: 400px;
+		max-width: 800px;
 	}
 
 	.key {
