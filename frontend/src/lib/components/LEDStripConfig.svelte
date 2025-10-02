@@ -31,6 +31,22 @@
 	// Initialize validation for LED settings
 	const { validationState, validateField, clearValidation } = createCategoryValidation('led');
 
+	// Validate individual field with proper category and field mapping
+	async function validateFieldMapped(field, value) {
+		const mappedField = fieldMapping[field] || field;
+		return await validateField(mappedField, value);
+	}
+	
+	// Map frontend field names to backend schema field names
+	const fieldMapping = {
+		'ledCount': 'count',
+		'ledType': 'strip_type',
+		'ledOrientation': 'reverse_order',
+		'brightness': 'brightness',
+		'gamma': 'gamma_correction',
+		'colorTemp': 'color_temperature'
+	};
+
 	export let disabled = false;
 
 	// Enhanced LED types with more detailed specifications
@@ -221,7 +237,7 @@
 	function handleConfigChange(field, value) {
 		if (field && value !== undefined) {
 			settings[field] = value;
-			validateField(field, value);
+			validateFieldMapped(field, value);
 		}
 		calculatePower();
 		validateConfig();
@@ -231,7 +247,7 @@
 	// Handle input changes for real-time validation
 	function handleInput(field, value) {
 		settings[field] = value;
-		validateField(field, value);
+		validateFieldMapped(field, value);
 	}
 
 	// Initialize calculations on component mount
@@ -265,8 +281,8 @@
 			bind:value={settings.ledType}
 			options={ledTypes.map(type => ({ value: type.value, label: type.label }))}
 			{disabled}
-			validationState={$validationState.ledType?.state}
-			error={$validationState.ledType?.error}
+			validationState={$validationState.strip_type?.state}
+			error={$validationState.strip_type?.error}
 			helpText="Select the type of LED strip you're using"
 			on:change={(e) => handleConfigChange('ledType', e.detail)}
 		/>
@@ -307,8 +323,8 @@
 			min="1"
 			max={settings.maxLedCount}
 			{disabled}
-			validationState={$validationState.ledCount?.state}
-			error={$validationState.ledCount?.error}
+			validationState={$validationState.count?.state}
+			error={$validationState.count?.error}
 			helpText={`Maximum: ${settings.maxLedCount} LEDs`}
 			on:input={(e) => handleInput('ledCount', e.detail)}
 			on:change={(e) => handleConfigChange('ledCount', e.detail)}
@@ -329,8 +345,8 @@
 				{ value: 'reversed', label: 'Reversed (End to Start)' }
 			]}
 			{disabled}
-			validationState={$validationState.ledOrientation?.state}
-			error={$validationState.ledOrientation?.error}
+			validationState={$validationState.reverse_order?.state}
+			error={$validationState.reverse_order?.error}
 			helpText="Direction of LED data flow"
 			on:change={(e) => handleConfigChange('ledOrientation', e.detail)}
 		/>
@@ -436,8 +452,8 @@
 			max="3.0"
 			step="0.1"
 			{disabled}
-			validationState={$validationState.gamma?.state}
-			error={$validationState.gamma?.error}
+			validationState={$validationState.gamma_correction?.state}
+			error={$validationState.gamma_correction?.error}
 			helpText="Gamma correction for color accuracy (1.0 - 3.0)"
 			on:input={(e) => handleInput('gamma', e.detail)}
 			on:change={(e) => handleConfigChange('gamma', e.detail)}
@@ -452,8 +468,8 @@
 			max="10000"
 			step="100"
 			{disabled}
-			validationState={$validationState.colorTemp?.state}
-			error={$validationState.colorTemp?.error}
+			validationState={$validationState.color_temperature?.state}
+			error={$validationState.color_temperature?.error}
 			helpText="Color temperature in Kelvin (2000K - 10000K)"
 			on:input={(e) => handleInput('colorTemp', e.detail)}
 			on:change={(e) => handleConfigChange('colorTemp', e.detail)}
