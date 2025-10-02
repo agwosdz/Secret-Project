@@ -70,8 +70,14 @@ def websocket_status_callback(status):
 
 LED_COUNT = 246
 
-# Initialize LED controller first
-led_controller = LEDController(num_pixels=LED_COUNT)
+# Initialize LED controller with error handling
+led_controller = None
+try:
+    led_controller = LEDController(num_pixels=LED_COUNT)
+    logger.info("LED controller initialized successfully")
+except Exception as e:
+    logger.warning(f"LED controller initialization failed: {e}")
+    logger.info("Running in LED-disabled mode - hardware test features will be limited")
 
 # Initialize settings service
 settings_service = SettingsService(websocket_callback=socketio.emit)

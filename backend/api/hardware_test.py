@@ -33,8 +33,10 @@ test_lock = threading.Lock()
 hardware_test_bp = Blueprint('hardware_test_api', __name__, url_prefix='/api/hardware-test')
 
 def get_socketio():
-    """Get the global SocketIO instance"""
+    """Get the global SocketIO instance with proper error handling"""
     from app import socketio
+    if not socketio:
+        raise RuntimeError("SocketIO instance not available - check application initialization")
     return socketio
 
 def emit_test_event(event_type: str, data: Dict[str, Any]):
@@ -175,7 +177,20 @@ def start_led_sequence():
         # Start sequence in background thread
         def run_sequence():
             try:
-                controller = LEDController(num_pixels=led_count, pin=gpio_pin)
+                # Check if we can run as root or have proper permissions
+                try:
+                    controller = LEDController(num_pixels=led_count, pin=gpio_pin)
+                except Exception as init_error:
+                    logger.error(f"LED controller initialization failed: {init_error}")
+                    emit_test_event('led_sequence_error', {
+                        'test_id': test_id,
+                        'error': f'Hardware initialization failed: {str(init_error)}. Try running with sudo or check GPIO permissions.'
+                    })
+                    with test_lock:
+                        if test_id in active_tests:
+                            active_tests[test_id]['status'] = 'error'
+                            active_tests[test_id]['error'] = str(init_error)
+                    return
                 
                 # Update test status
                 with test_lock:
