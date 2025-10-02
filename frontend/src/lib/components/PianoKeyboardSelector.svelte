@@ -1,18 +1,51 @@
-<script>
+<script lang="ts">
 	import { createEventDispatcher } from 'svelte';
 
 	const dispatch = createEventDispatcher();
 
-	export let settings = {};
-	export let disabled = false;
+	// Define proper types for settings
+	interface PianoSettings {
+		size?: string;
+		keyMapping?: string;
+	}
 
-	// Extract current values from settings
+	interface LEDSettings {
+		ledCount?: number;
+		ledOrientation?: string;
+	}
+
+	interface Settings {
+		piano?: PianoSettings;
+		led?: LEDSettings;
+	}
+
+	export let settings: Settings = {};
+	export let disabled: boolean = false;
+
+	// Define types for piano size data
+	interface PianoSize {
+		value: string;
+		label: string;
+		keys: number;
+		octaves: number;
+		description: string;
+		startNote: string;
+		endNote: string;
+	}
+
+	interface KeyMappingOption {
+		value: string;
+		label: string;
+		description: string;
+	}
+
+	// Extract current values from settings with proper type safety
 	$: selectedSize = settings.piano?.size || '88-key';
 	$: ledCount = settings.led?.ledCount || 246;
 	$: ledOrientation = settings.led?.ledOrientation || 'normal';
 	$: keyMapping = settings.piano?.keyMapping || 'chromatic';
 
-	const pianoSizes = [
+	const pianoSizes: PianoSize[] = [
 		{ value: '25-key', label: '25-Key Mini', keys: 25, octaves: 2, description: 'Compact MIDI controller', startNote: 'C3', endNote: 'C5' },
 		{ value: '37-key', label: '37-Key Compact', keys: 37, octaves: 3, description: 'Small synthesizer', startNote: 'C2', endNote: 'C5' },
 		{ value: '49-key', label: '49-Key Standard', keys: 49, octaves: 4, description: 'Home keyboard', startNote: 'C2', endNote: 'C6' },
@@ -22,18 +55,22 @@
 		{ value: 'custom', label: 'Custom Size', keys: 0, octaves: 0, description: 'Define your own layout', startNote: '', endNote: '' }
 	];
 
-	const keyMappingOptions = [
+	const keyMappingOptions: KeyMappingOption[] = [
 		{ value: 'chromatic', label: 'Chromatic (All Keys)', description: 'Map LEDs to all piano keys including black keys' },
 		{ value: 'white-keys-only', label: 'White Keys Only', description: 'Map LEDs only to white keys (C, D, E, F, G, A, B)' },
 		{ value: 'custom', label: 'Custom Mapping', description: 'Define custom key-to-LED mapping' }
 	];
 
-	function handleSizeChange(size) {
+	function handleSizeChange(size: string) {
 		const sizeData = pianoSizes.find(p => p.value === size);
+		if (!sizeData) return;
+		
 		const updatedSettings = {
 			...settings,
 			piano: {
 				...settings.piano,
+				enabled: settings.piano?.enabled ?? true,
+				octave: settings.piano?.octave ?? 4,
 				size: size,
 				keys: sizeData.keys,
 				octaves: sizeData.octaves,
@@ -47,6 +84,9 @@
 			const estimatedLEDs = calculateLEDCount(sizeData.keys, keyMapping);
 			updatedSettings.led = {
 				...settings.led,
+				enabled: settings.led?.enabled ?? true,
+				count: settings.led?.count ?? estimatedLEDs,
+				brightness: settings.led?.brightness ?? 50,
 				ledCount: estimatedLEDs
 			};
 		}
@@ -54,7 +94,7 @@
 		dispatch('change', updatedSettings);
 	}
 
-	function handleKeyMappingChange(mapping) {
+	function handleKeyMappingChange(mapping: string) {
 		const sizeData = pianoSizes.find(p => p.value === selectedSize);
 		const estimatedLEDs = calculateLEDCount(sizeData?.keys || 88, mapping);
 		
@@ -62,10 +102,15 @@
 			...settings,
 			piano: {
 				...settings.piano,
+				enabled: settings.piano?.enabled ?? true,
+				octave: settings.piano?.octave ?? 4,
 				keyMapping: mapping
 			},
 			led: {
 				...settings.led,
+				enabled: settings.led?.enabled ?? true,
+				count: settings.led?.count ?? estimatedLEDs,
+				brightness: settings.led?.brightness ?? 50,
 				ledCount: estimatedLEDs
 			}
 		};
@@ -73,7 +118,7 @@
 		dispatch('change', updatedSettings);
 	}
 
-	function calculateLEDCount(keys, mapping) {
+	function calculateLEDCount(keys: number, mapping: string): number {
 		switch (mapping) {
 			case 'white-keys-only':
 				// Approximate 7 white keys per octave
@@ -84,17 +129,28 @@
 		}
 	}
 
-	function renderKeyboard(size) {
+	function renderKeyboard(size: string) {
 		const sizeData = pianoSizes.find(p => p.value === size);
 		if (!sizeData || sizeData.keys === 0) return [];
 
 		const keys = [];
-		const totalWidth = 400;
+		// Calculate container width dynamically to fill available space
+		// Use the keyboard container's actual width or fallback to max-width
+		let containerWidth = 1200; // Default fallback
+		
+		// Try to get actual container width if element exists
+		if (typeof window !== 'undefined') {
+			const keyboardElement = document.querySelector('.keyboard');
+			if (keyboardElement) {
+				containerWidth = keyboardElement.offsetWidth || 1200;
+			}
+		}
+		
 		const whiteKeyCount = Math.ceil(sizeData.keys * 0.58); // Approximate white key count
-		const whiteKeyWidth = totalWidth / whiteKeyCount;
-		const blackKeyWidth = whiteKeyWidth * 0.6;
-		const blackKeyHeight = 60;
-		const whiteKeyHeight = 100;
+		const whiteKeyWidth = containerWidth / whiteKeyCount; // Fill entire width
+		const blackKeyWidth = whiteKeyWidth * 0.65; // Slightly wider black keys
+		const blackKeyHeight = 80; // Taller black keys
+		const whiteKeyHeight = 120; // Taller white keys
 
 		let whiteKeyIndex = 0;
 		let ledIndex = 0;
@@ -216,7 +272,7 @@
 			<h3 class="section-title">Visual Key-to-LED Mapping Preview</h3>
 			<div class="keyboard-container">
 				<div class="keyboard-wrapper">
-					<div class="keyboard" style="height: 120px; position: relative;">
+					<div class="keyboard" style="height: 140px; position: relative;">
 						{#each keyboardKeys as key}
 							<div
 								class="key"
@@ -421,21 +477,24 @@
 		border: 2px solid #ccc;
 		border-radius: 8px;
 		background: #f8f8f8;
-		overflow: visible;
+		overflow: hidden; /* Changed from visible to hidden to contain keys */
 		box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 		width: 100%;
-		min-width: 400px;
-		max-width: 800px;
+		min-width: 800px; /* Increased minimum width */
+		max-width: 1200px; /* Increased maximum width */
+		height: 140px; /* Increased height to accommodate taller keys */
+		position: relative; /* Ensure proper positioning context */
 	}
 
 	.key {
-		border: 1px solid #ddd;
+		border: 2px solid #ddd; /* Thicker border for better visibility */
 		cursor: pointer;
 		transition: all 0.2s ease;
 		display: flex;
 		align-items: flex-end;
 		justify-content: center;
-		padding-bottom: 4px;
+		padding-bottom: 6px; /* Increased padding */
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Added subtle shadow */
 	}
 
 	.key.white {
@@ -470,14 +529,15 @@
 	}
 
 	.led-indicator {
-		font-size: 0.7rem;
+		font-size: 0.8rem; /* Slightly larger font */
 		font-weight: bold;
 		color: #00aa00;
-		background: rgba(255, 255, 255, 0.9);
-		border-radius: 2px;
-		padding: 1px 3px;
-		min-width: 16px;
+		background: rgba(255, 255, 255, 0.95); /* More opaque background */
+		border-radius: 3px; /* Slightly larger border radius */
+		padding: 2px 4px; /* Increased padding */
+		min-width: 20px; /* Wider minimum width */
 		text-align: center;
+		border: 1px solid rgba(0, 170, 0, 0.3); /* Subtle border */
 	}
 
 	.key.black .led-indicator {
@@ -531,8 +591,8 @@
 		}
 		
 		.keyboard {
-			transform: scale(0.8);
-			transform-origin: center;
+			min-width: 600px; /* Reduce minimum width for smaller screens */
+			max-width: 100%; /* Allow full width on smaller screens */
 		}
 		
 		.mapping-option {
@@ -547,7 +607,8 @@
 		}
 		
 		.keyboard {
-			transform: scale(0.6);
+			min-width: 400px; /* Further reduce for mobile */
+			max-width: 100%;
 		}
 	}
 </style>
