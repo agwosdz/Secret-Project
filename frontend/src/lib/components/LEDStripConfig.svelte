@@ -39,12 +39,24 @@
 	
 	// Map frontend field names to backend schema field names
 	const fieldMapping = {
-		'ledCount': 'count',
-		'ledType': 'strip_type',
-		'ledOrientation': 'reverse_order',
+		'ledCount': 'led_count',
+		'maxLedCount': 'max_led_count',
+		'ledType': 'led_type',
+		'ledOrientation': 'led_orientation',
+		'ledStripType': 'led_strip_type',
+		'powerSupplyVoltage': 'power_supply_voltage',
+		'powerSupplyCurrent': 'power_supply_current',
 		'brightness': 'brightness',
+		'colorProfile': 'color_profile',
+		'performanceMode': 'performance_mode',
 		'gamma': 'gamma_correction',
-		'colorTemp': 'color_temperature'
+		'colorTemp': 'color_temperature',
+		'dither': 'dither_enabled',
+		'updateRate': 'update_rate',
+		'powerLimiting': 'power_limiting_enabled',
+		'maxPowerWatts': 'max_power_watts',
+		'thermalProtection': 'thermal_protection_enabled',
+		'maxTemp': 'max_temperature_celsius'
 	};
 
 	export let disabled = false;

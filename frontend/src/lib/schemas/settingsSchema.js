@@ -52,7 +52,24 @@ export const settingsSchema = {
             data_pin: { type: 'number', minimum: 1, maximum: 40, default: 18 },
             clock_pin: { type: 'number', minimum: 1, maximum: 40, default: 19 },
             reverse_order: { type: 'boolean', default: false },
-            color_mode: { type: 'string', enum: ['rainbow', 'velocity', 'note', 'custom'], default: 'velocity' }
+            color_mode: { type: 'string', enum: ['rainbow', 'velocity', 'note', 'custom'], default: 'velocity' },
+            // Additional LED configuration properties
+            led_count: { type: 'number', minimum: 1, maximum: 1000, default: 88 },
+            max_led_count: { type: 'number', minimum: 1, maximum: 1000, default: 300 },
+            led_type: { type: 'string', enum: ['WS2812B', 'WS2813', 'WS2815', 'APA102', 'SK6812'], default: 'WS2812B' },
+            led_orientation: { type: 'string', enum: ['normal', 'reversed'], default: 'normal' },
+            led_strip_type: { type: 'string', enum: ['WS2811_STRIP_GRB', 'WS2811_STRIP_RGB', 'WS2811_STRIP_BRG', 'WS2811_STRIP_BGR'], default: 'WS2811_STRIP_GRB' },
+            power_supply_voltage: { type: 'number', minimum: 3.0, maximum: 24.0, default: 5.0 },
+            power_supply_current: { type: 'number', minimum: 0.1, maximum: 100.0, default: 10.0 },
+            color_profile: { type: 'string', enum: ['Standard RGB', 'sRGB', 'Adobe RGB', 'Wide Gamut'], default: 'Standard RGB' },
+            performance_mode: { type: 'string', enum: ['Power Saving', 'Balanced', 'Performance', 'Maximum'], default: 'Balanced' },
+            white_balance: { type: 'object', default: { r: 1.0, g: 1.0, b: 1.0 } },
+            dither_enabled: { type: 'boolean', default: false },
+            update_rate: { type: 'number', minimum: 1, maximum: 120, default: 30 },
+            power_limiting_enabled: { type: 'boolean', default: true },
+            max_power_watts: { type: 'number', minimum: 1, maximum: 1000, default: 50 },
+            thermal_protection_enabled: { type: 'boolean', default: true },
+            max_temperature_celsius: { type: 'number', minimum: 40, maximum: 100, default: 70 }
         }
     },
     
