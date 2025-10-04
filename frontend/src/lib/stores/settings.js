@@ -632,11 +632,11 @@ class SettingsAPI {
             settingsError.set(null);
             
             const response = await fetch(`${this.baseUrl}/bulk`, {
-                method: 'PUT',
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ settings: settingsData })
+                body: JSON.stringify(settingsData)
             });
             
             const data = await response.json();
