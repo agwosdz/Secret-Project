@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { uploadMidiFile, validateMidiFile, formatFileSize, UploadError, type UploadProgress, type ValidationResult } from '$lib/upload';
-	import { toastStore } from '$lib/stores/toastStore.js';
+import { toastStore } from '$lib/stores/toastStore.js';
 import { historyStore, setupHistoryKeyboardShortcuts } from '$lib/stores/historyStore.js';
 import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
 import ProgressBar from '$lib/components/ProgressBar.svelte';
@@ -9,12 +9,75 @@ import UndoRedoControls from '$lib/components/UndoRedoControls.svelte';
 import Tooltip from '$lib/components/Tooltip.svelte';
 import OnboardingTour from '$lib/components/OnboardingTour.svelte';
 import PreferencesModal from '$lib/components/PreferencesModal.svelte';
-
+import ErrorRecoveryPanel from '$lib/components/ErrorRecoveryPanel.svelte';
+import ValidationPreview from '$lib/components/ValidationPreview.svelte';
 import StatusDisplay from '$lib/components/StatusDisplay.svelte';
 
+import { errorRecovery, handleValidationError, handleUploadError, handleNetworkError, type ErrorContext } from '$lib/errorRecovery';
+import { errorAnalytics } from '$lib/analytics/errorAnalytics.js';
+
 import { statusManager, statusUtils } from '$lib/statusCommunication';
-import { helpActions, shouldShowOnboarding, setupHelpKeyboardShortcuts } from '$lib/stores/helpStore.js';
-import { uploadPreferences, uiPreferences, preferenceActions, preferenceUtils } from '$lib/stores/preferencesStore.js';
+import { settings, settingsAPI } from '$lib/stores/settings.js';
+import { derived } from 'svelte/store';
+
+// Create derived stores for specific preference categories from unified settings
+const uploadPreferences = derived(settings, ($settings) => $settings.upload || {});
+const uiPreferences = derived(settings, ($settings) => $settings.ui || {});
+const helpPreferences = derived(settings, ($settings) => $settings.help || {});
+
+// Utility functions for preferences
+const preferenceUtils = {
+	shouldShowTooltips: () => {
+		const ui = $uiPreferences;
+		return ui.showTooltips !== false;
+	},
+	getTooltipDelay: () => {
+		const ui = $uiPreferences;
+		return ui.tooltipDelay || 500;
+	},
+	shouldReduceMotion: () => {
+		const a11y = $settings.a11y || {};
+		return a11y.reducedMotion === true;
+	}
+};
+
+const shouldShowOnboarding = derived(helpPreferences, ($help) => {
+	return !$help.tourCompleted && $help.showOnboarding !== false;
+});
+
+// Keyboard shortcuts for help system
+function setupHelpKeyboardShortcuts() {
+	if (typeof window === 'undefined') return;
+
+	function handleKeydown(event) {
+		// F1 - Show help
+		if (event.key === 'F1') {
+			event.preventDefault();
+			// Dispatch custom event for help
+			window.dispatchEvent(new CustomEvent('show-help'));
+		}
+
+		// Ctrl/Cmd + ? - Show keyboard shortcuts
+		if ((event.ctrlKey || event.metaKey) && event.key === '/') {
+			event.preventDefault();
+			window.dispatchEvent(new CustomEvent('show-shortcuts'));
+		}
+
+		// Ctrl/Cmd + Shift + ? - Start tour
+		if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === '/') {
+			event.preventDefault();
+			settingsAPI.setSetting('help', 'tourCompleted', false);
+			window.dispatchEvent(new CustomEvent('start-tour'));
+		}
+	}
+
+	document.addEventListener('keydown', handleKeydown);
+
+	// Return cleanup function
+	return () => {
+		document.removeEventListener('keydown', handleKeydown);
+	};
+}
 import { onMount } from 'svelte';
 
 	let fileInput: HTMLInputElement;
@@ -29,6 +92,17 @@ import { onMount } from 'svelte';
 	let helpKeyboardCleanup = null;
 	let showPreferencesModal = false;
 	let validationResult: ValidationResult | null = null;
+	let currentError: ErrorContext | null = null;
+	
+	// Validation preview state
+	let showValidationPreview = false;
+	let previewFiles: File[] = [];
+	let validationPreviewEnabled = true;
+	
+	// Reactive statement to sync validation preview setting
+	$: if ($settings?.upload?.enableValidationPreview !== undefined) {
+		validationPreviewEnabled = $settings.upload.enableValidationPreview;
+	}
 	
 	
 
@@ -64,9 +138,22 @@ import { onMount } from 'svelte';
 		if (!file) {
 			selectedFile = null;
 			fileMetadata = null;
+			resetValidationPreview();
 			return;
 		}
 
+		// Show validation preview if enabled
+		if (validationPreviewEnabled) {
+			previewFiles = [file];
+			showValidationPreview = true;
+			return;
+		}
+
+		// Direct processing if preview is disabled
+		processFileSelection(file);
+	}
+
+	function processFileSelection(file: File) {
 		// Validate file type
 		if (!file.name.toLowerCase().match(/\.(mid|midi)$/)) {
 			uploadMessage = 'Only .mid and .midi files are supported';
@@ -87,7 +174,7 @@ import { onMount } from 'svelte';
 
 		// Remember last directory if preference is enabled
 		if (uploadPrefs?.rememberLastDirectory && file.webkitRelativePath) {
-			preferenceActions.update('upload', 'lastDirectory', file.webkitRelativePath);
+			settingsAPI.setSetting('upload', 'lastDirectory', file.webkitRelativePath);
 		}
 
 		processSelectedFile(file);
@@ -96,6 +183,11 @@ import { onMount } from 'svelte';
 		if (file) {
 			saveState(`Selected file: ${file.name}`);
 		}
+	}
+
+	function resetValidationPreview() {
+		showValidationPreview = false;
+		previewFiles = [];
 	}
 
 
@@ -109,16 +201,36 @@ import { onMount } from 'svelte';
 		validationResult = validation;
 		
 		if (!validation.valid) {
+			// Use enhanced error recovery system for validation errors
+			currentError = await handleValidationError(
+				validation.message,
+				{
+					fileName: file.name,
+					fileSize: file.size,
+					fileType: file.type,
+					validationDetails: validation
+				},
+				() => {
+					// Retry action - allow user to select a new file
+					fileInput?.click();
+				},
+				() => {
+					// Clear error and reset state
+					currentError = null;
+					uploadStatus = 'idle';
+					uploadMessage = '';
+					selectedFile = null;
+					fileMetadata = null;
+					if (fileInput) {
+						fileInput.value = '';
+					}
+				}
+			);
+			
 			uploadStatus = 'error';
-			uploadMessage = validation.message + (validation.suggestion ? ` ${validation.suggestion}` : '');
+			uploadMessage = validation.message;
 			selectedFile = null;
 			fileMetadata = null;
-			
-			// Show validation error toast with suggestion
-			toastStore.error(validation.message, {
-				title: 'Invalid File',
-				description: validation.suggestion
-			});
 			
 			statusUtils.processingError(processingId, file.name, validation.message);
 			
@@ -173,7 +285,7 @@ import { onMount } from 'svelte';
 		}
 	}
 
-	function handleDrop(event: DragEvent) {
+	async function handleDrop(event: DragEvent) {
 		event.preventDefault();
 		isDragOver = false;
 		dragCounter = 0;
@@ -182,30 +294,80 @@ import { onMount } from 'svelte';
 		if (files && files.length > 0) {
 			const file = files[0];
 			
-			// Validate file type
-			if (!file.name.toLowerCase().match(/\.(mid|midi)$/)) {
-				uploadMessage = 'Only .mid and .midi files are supported';
-				uploadStatus = 'error';
+			// Show validation preview if enabled
+			if (validationPreviewEnabled) {
+				previewFiles = [file];
+				showValidationPreview = true;
 				return;
 			}
-			
-			// Validate file size (1MB limit)
-			if (file.size > 1024 * 1024) {
-				uploadMessage = 'File size must be less than 1MB';
-				uploadStatus = 'error';
-				return;
-			}
-			
-			// Clear any previous error states
-			uploadMessage = '';
-			uploadStatus = 'idle';
-			
-			processSelectedFile(file);
-			
-			// Save state after drag and drop
-			if (file) {
-				saveState(`Dropped file: ${file.name}`);
-			}
+
+			// Direct processing if preview is disabled
+			await processDroppedFile(file);
+		}
+	}
+
+	async function processDroppedFile(file: File) {
+		// Validate file type
+		if (!file.name.toLowerCase().match(/\.(mid|midi)$/)) {
+			currentError = await handleValidationError(
+				'Only .mid and .midi files are supported',
+				{
+					fileName: file.name,
+					fileSize: file.size,
+					fileType: file.type,
+					validationDetails: { valid: false, message: 'Invalid file type', suggestion: 'Please select a MIDI file (.mid or .midi)' }
+				},
+				() => {
+					// Retry action - allow user to select a new file
+					fileInput?.click();
+				},
+				() => {
+					// Clear error
+					currentError = null;
+					uploadStatus = 'idle';
+					uploadMessage = '';
+				}
+			);
+			uploadMessage = 'Only .mid and .midi files are supported';
+			uploadStatus = 'error';
+			return;
+		}
+		
+		// Validate file size (1MB limit)
+		if (file.size > 1024 * 1024) {
+			currentError = await handleValidationError(
+				'File size must be less than 1MB',
+				{
+					fileName: file.name,
+					fileSize: file.size,
+					fileType: file.type,
+					validationDetails: { valid: false, message: 'File too large', suggestion: 'Please select a smaller MIDI file (under 1MB)' }
+				},
+				() => {
+					// Retry action - allow user to select a new file
+					fileInput?.click();
+				},
+				() => {
+					// Clear error
+					currentError = null;
+					uploadStatus = 'idle';
+					uploadMessage = '';
+				}
+			);
+			uploadMessage = 'File size must be less than 1MB';
+			uploadStatus = 'error';
+			return;
+		}
+		
+		// Clear any previous error states
+		uploadMessage = '';
+		uploadStatus = 'idle';
+		
+		processSelectedFile(file);
+		
+		// Save state after drag and drop
+		if (file) {
+			saveState(`Dropped file: ${file.name}`);
 		}
 	}
 
@@ -261,15 +423,30 @@ import { onMount } from 'svelte';
 				saveState('Reset upload form');
 			}, 2000);
 		} catch (error) {
+			// Use enhanced error recovery system for upload errors
+			const errorMessage = error instanceof UploadError ? error.message : 'An unexpected error occurred during upload';
+			
+			currentError = await handleUploadError(
+				errorMessage,
+				{
+					fileName: selectedFile.name,
+					fileSize: selectedFile.size,
+					fileType: selectedFile.type,
+					uploadProgress: uploadProgress,
+					error: error
+				},
+				() => {
+					// Retry action
+					handleUpload();
+				},
+				() => {
+					// Clear error and reset
+					currentError = null;
+					resetUpload();
+				}
+			);
+			
 			uploadStatus = 'error';
-			let errorMessage = 'An unexpected error occurred during upload';
-			
-			if (error instanceof UploadError) {
-				errorMessage = error.message;
-			} else {
-				console.error('Upload error:', error);
-			}
-			
 			uploadMessage = errorMessage;
 			
 			// Show upload error with retry action
@@ -349,14 +526,23 @@ import { onMount } from 'svelte';
 	}
 
 	// Onboarding tour handlers
-	function handleTourComplete() {
-		helpActions.completeTour();
-		showOnboardingTour = false;
+	async function handleTourComplete() {
+		try {
+			await settingsAPI.setSetting('help', 'tourCompleted', true);
+			showOnboardingTour = false;
+		} catch (error) {
+			console.error('Failed to save tour completion:', error);
+		}
 	}
 
-	function handleTourSkip() {
-		helpActions.skipTour();
-		showOnboardingTour = false;
+	async function handleTourSkip() {
+		try {
+			await settingsAPI.setSetting('help', 'tourCompleted', true);
+			await settingsAPI.setSetting('help', 'tourSkipped', true);
+			showOnboardingTour = false;
+		} catch (error) {
+			console.error('Failed to save tour skip:', error);
+		}
 	}
 
 	// Preferences modal handlers
@@ -390,7 +576,7 @@ import { onMount } from 'svelte';
 		helpKeyboardCleanup = setupHelpKeyboardShortcuts();
 		
 		// Set help context
-		helpActions.setContext('upload');
+		settingsAPI.setSetting('help', 'currentContext', 'upload');
 		
 		// Check if onboarding should be shown
 		const unsubscribe = shouldShowOnboarding.subscribe(shouldShow => {
@@ -423,6 +609,73 @@ import { onMount } from 'svelte';
 			window.removeEventListener('start-tour', handleStartTour);
 		};
 	});
+
+	// Validation preview event handlers
+	function handleValidationProceed(event: CustomEvent<{ files: File[] }>) {
+		const files = event.detail.files;
+		if (files.length > 0) {
+			const file = files[0];
+			
+			// Track prevention event - user reviewed and proceeded
+			errorAnalytics.trackPrevention({
+				type: 'validation-review',
+				action: 'proceed-after-preview',
+				timestamp: new Date(),
+				context: {
+					fileName: file.name,
+					fileSize: file.size,
+					fileType: file.type,
+					validationPreviewEnabled: true
+				}
+			});
+			
+			processFileSelection(file);
+		}
+		resetValidationPreview();
+	}
+
+	function handleValidationCancel() {
+		// Track prevention event - user cancelled after review
+		errorAnalytics.trackPrevention({
+			type: 'validation-review',
+			action: 'cancel-after-preview',
+			timestamp: new Date(),
+			context: {
+				validationPreviewEnabled: true,
+				filesInPreview: previewFiles.length
+			}
+		});
+		
+		resetValidationPreview();
+		// Reset file input
+		if (fileInput) {
+			fileInput.value = '';
+		}
+	}
+
+	function handleValidationFix(event: CustomEvent<{ issue: any; files: File[] }>) {
+		const { issue } = event.detail;
+		
+		// Track prevention event - user chose to fix issues
+		errorAnalytics.trackPrevention({
+			type: 'validation-review',
+			action: 'fix-issues',
+			timestamp: new Date(),
+			context: {
+				issueType: issue.type,
+				validationPreviewEnabled: true,
+				filesInPreview: previewFiles.length
+			}
+		});
+		
+		// Handle different types of fixes
+		if (issue.type === 'error') {
+			// For errors, show file picker to select a new file
+			fileInput?.click();
+		}
+		
+		resetValidationPreview();
+	}
 </script>
 
 <svelte:head>
@@ -759,6 +1012,15 @@ import { onMount } from 'svelte';
 			</div>
 		</div>
 
+		<!-- Validation Preview Modal -->
+		{#if showValidationPreview && previewFiles.length > 0}
+			<ValidationPreview
+				files={previewFiles}
+				on:proceed={handleValidationProceed}
+				on:cancel={handleValidationCancel}
+				on:fix={handleValidationFix}
+			/>
+		{/if}
 
 		
 		{#if uploadMessage && uploadStatus !== 'error'}
@@ -790,6 +1052,24 @@ import { onMount } from 'svelte';
 					<p>{uploadMessage}</p>
 				{/if}
 			</div>
+		{/if}
+
+		<!-- Enhanced Error Recovery Panel -->
+		{#if currentError}
+			<ErrorRecoveryPanel 
+				error={currentError}
+				on:action={(event) => {
+					const action = event.detail;
+					if (action.handler) {
+						action.handler();
+					}
+				}}
+				on:dismiss={() => {
+					currentError = null;
+					uploadStatus = 'idle';
+					uploadMessage = '';
+				}}
+			/>
 		{/if}
 	</main>
 	

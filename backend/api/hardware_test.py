@@ -47,6 +47,75 @@ def emit_test_event(event_type: str, data: Dict[str, Any]):
     except Exception as e:
         logger.error(f"Error emitting test event: {e}")
 
+# Legacy endpoint for backward compatibility
+@hardware_test_bp.route('/', methods=['POST'])
+def test_hardware_legacy():
+    """Legacy hardware test endpoint for backward compatibility with /api/test-hardware"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': 'No configuration data provided'
+            }), 400
+        
+        # Validate GPIO pin availability
+        gpio_pin = data.get('gpio_pin', 18)
+        try:
+            from config import validate_gpio_pin_availability
+            if not validate_gpio_pin_availability(gpio_pin):
+                return jsonify({
+                    'success': False,
+                    'message': f'GPIO pin {gpio_pin} is not available or already in use'
+                }), 200
+        except Exception as e:
+            logger.warning(f"GPIO validation failed: {e}")
+        
+        # Test LED controller initialization
+        if LEDController:
+            try:
+                test_controller = LEDController(
+                    led_count=data.get('led_count', 246),
+                    gpio_pin=gpio_pin,
+                    freq_hz=data.get('led_frequency', 800000),
+                    dma=data.get('led_dma', 10),
+                    channel=data.get('led_channel', 0),
+                    invert=data.get('led_invert', False),
+                    brightness=int(data.get('brightness', 0.5) * 255)
+                )
+                
+                # Test basic LED functionality
+                test_controller.clear()
+                test_controller.set_pixel(0, (255, 0, 0))  # Red test
+                test_controller.show()
+                time.sleep(0.1)
+                test_controller.clear()
+                test_controller.show()
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'Hardware test passed successfully'
+                }), 200
+                
+            except Exception as e:
+                logger.error(f"LED controller test failed: {e}")
+                return jsonify({
+                    'success': False,
+                    'message': f'LED controller test failed: {str(e)}'
+                }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'LED controller not available (hardware dependencies missing)'
+            }), 503
+            
+    except Exception as e:
+        logger.error(f"Hardware test error: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Hardware test failed: {str(e)}'
+        }), 500
+
 @hardware_test_bp.route('/led/individual', methods=['POST'])
 def test_individual_led():
     """Test individual LED functionality"""

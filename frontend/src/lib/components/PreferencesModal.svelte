@@ -1,6 +1,16 @@
 <script>
 	import { createEventDispatcher } from 'svelte';
-	import { preferences, preferenceActions, applySmartDefaults } from '$lib/stores/preferencesStore.js';
+	import { settings, settingsAPI } from '$lib/stores/settings.js';
+	import { derived } from 'svelte/store';
+	
+	// Create derived stores for preference categories from unified settings
+	const preferences = derived(settings, ($settings) => ({
+		upload: $settings.upload || {},
+		ui: $settings.ui || {},
+		a11y: $settings.a11y || {},
+		help: $settings.help || {},
+		history: $settings.history || {}
+	}));
 	import { InteractiveButton } from '$lib/components';
 	
 	const dispatch = createEventDispatcher();
@@ -11,15 +21,21 @@
 	// Track if changes have been made
 	$: hasChanges = JSON.stringify(localPrefs) !== JSON.stringify($preferences);
 	
-	function handleSave() {
-		preferenceActions.updateMultiple({
-			upload: localPrefs.upload,
-			ui: localPrefs.ui,
-			a11y: localPrefs.a11y,
-			help: localPrefs.help,
-			history: localPrefs.history
-		});
-		dispatch('close');
+	async function handleSave() {
+		try {
+			// Update each preference category using the unified settings API
+			await settingsAPI.updateSettings({
+				upload: localPrefs.upload,
+				ui: localPrefs.ui,
+				a11y: localPrefs.a11y,
+				help: localPrefs.help,
+				history: localPrefs.history
+			});
+			dispatch('close');
+		} catch (error) {
+			console.error('Failed to save preferences:', error);
+			alert('Failed to save preferences. Please try again.');
+		}
 	}
 	
 	function handleCancel() {
@@ -30,44 +46,88 @@
 		dispatch('close');
 	}
 	
-	function handleReset() {
+	async function handleReset() {
 		const confirmed = confirm('This will reset all preferences to their default values. Are you sure?');
 		if (confirmed) {
-			preferenceActions.reset();
-			localPrefs = { ...$preferences };
+			try {
+				// Reset preference categories using the unified settings API
+				await settingsAPI.resetCategory('upload');
+				await settingsAPI.resetCategory('ui');
+				await settingsAPI.resetCategory('a11y');
+				await settingsAPI.resetCategory('help');
+				await settingsAPI.resetCategory('history');
+				localPrefs = { ...$preferences };
+			} catch (error) {
+				console.error('Failed to reset preferences:', error);
+				alert('Failed to reset preferences. Please try again.');
+			}
 		}
 	}
 	
-	function handleApplySmartDefaults() {
-		applySmartDefaults();
-		localPrefs = { ...$preferences };
+	async function handleApplySmartDefaults() {
+		try {
+			// Apply smart defaults by updating with optimized settings
+			const smartDefaults = {
+				upload: {
+					...localPrefs.upload,
+					autoProcess: true,
+					showPreview: true
+				},
+				ui: {
+					...localPrefs.ui,
+					theme: 'auto',
+					animations: true
+				},
+				a11y: {
+					...localPrefs.a11y,
+					highContrast: false,
+					reducedMotion: false
+				}
+			};
+			
+			await settingsAPI.updateSettings(smartDefaults);
+			localPrefs = { ...$preferences };
+		} catch (error) {
+			console.error('Failed to apply smart defaults:', error);
+			alert('Failed to apply smart defaults. Please try again.');
+		}
 	}
 	
-	function handleExport() {
-		const data = JSON.stringify($preferences, null, 2);
-		const blob = new Blob([data], { type: 'application/json' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = 'midi-visualizer-preferences.json';
-		a.click();
-		URL.revokeObjectURL(url);
+	async function handleExport() {
+		try {
+			const exportedSettings = await settingsAPI.exportSettings();
+			const data = JSON.stringify(exportedSettings, null, 2);
+			const blob = new Blob([data], { type: 'application/json' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = 'midi-visualizer-settings.json';
+			a.click();
+			URL.revokeObjectURL(url);
+		} catch (error) {
+			console.error('Failed to export settings:', error);
+			alert('Failed to export settings. Please try again.');
+		}
 	}
 	
-	function handleImport(event) {
+	async function handleImport(event) {
 		const file = event.target.files[0];
 		if (!file) return;
 		
 		const reader = new FileReader();
-		reader.onload = (e) => {
+		reader.onload = async (e) => {
 			try {
-				const importedPrefs = JSON.parse(e.target.result);
-				const success = preferenceActions.import(importedPrefs);
-				if (success) {
-					localPrefs = { ...$preferences };
-					alert('Preferences imported successfully!');
-				} else {
-					alert('Failed to import preferences. Please check the file format.');
+				const importedSettings = JSON.parse(e.target.result);
+				await settingsAPI.importSettings(importedSettings);
+				localPrefs = { ...$preferences };
+				alert('Settings imported successfully!');
+			} catch (error) {
+				console.error('Failed to import settings:', error);
+				alert('Failed to import settings. Please check the file format.');
+			}
+		};
+		reader.readAsText(file);
+	}
 				}
 			} catch (error) {
 				alert('Invalid preferences file.');
@@ -122,6 +182,14 @@
 								bind:checked={localPrefs.upload.confirmBeforeReset}
 							/>
 							<span>Confirm before resetting</span>
+						</label>
+						
+						<label class="checkbox-label">
+							<input 
+								type="checkbox" 
+								bind:checked={localPrefs.upload.enableValidationPreview}
+							/>
+							<span>Show validation preview before upload</span>
 						</label>
 					</div>
 				</section>

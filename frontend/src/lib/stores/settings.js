@@ -18,45 +18,41 @@ let autoSaveTimeout = null;
 const AUTO_SAVE_DELAY = 2000; // 2 seconds
 
 /**
- * Migrate flat settings structure to nested schema structure
- * This handles legacy localStorage data that may have a flat structure
+ * Migrate settings from old structure to new consolidated structure
  */
 function migrateSettingsStructure(settings) {
-    // Check if settings already have proper nested structure
-    if (settings.led || settings.piano || settings.audio || settings.gpio || settings.hardware) {
-        return settings; // Already properly structured
+    // Check if this is already the new structure
+    if (settings && typeof settings === 'object' && 
+        (settings.led || settings.piano || settings.audio || settings.gpio || settings.hardware)) {
+        return settings;
     }
 
-    // Define field mappings from flat structure to nested structure
+    // Legacy field mappings for backward compatibility
     const fieldMappings = {
         // LED settings
+        'ledCount': ['led', 'led_count'],
         'brightness': ['led', 'brightness'],
-        'ledCount': ['led', 'count'],
-        'maxLedCount': ['led', 'max_count'],
-        'ledType': ['led', 'strip_type'],
-        'ledOrientation': ['led', 'reverse_order'],
-        'ledStripType': ['led', 'strip_type'],
-        'powerSupplyVoltage': ['led', 'power_supply_voltage'],
-        'powerSupplyCurrent': ['led', 'power_supply_current'],
-        'gamma': ['led', 'gamma_correction'],
-        'colorTemp': ['led', 'color_temperature'],
-        'led_orientation': ['led', 'reverse_order'],
-        'led_type': ['led', 'strip_type'],
+        'colorScheme': ['led', 'colorScheme'],
+        'animationSpeed': ['led', 'animationSpeed'],
+        'gpioPin': ['led', 'gpioPin'],
+        'ledOrientation': ['led', 'ledOrientation'],
+        'ledType': ['led', 'ledType'],
+        'gammaCorrection': ['led', 'gammaCorrection'],
         
         // Piano settings
-        'pianoEnabled': ['piano', 'enabled'],
-        'pianoSize': ['piano', 'size'],
-        'noteRange': ['piano', 'note_range'],
+        'pianoOctave': ['piano', 'octave'],
+        'velocitySensitivity': ['piano', 'velocity_sensitivity'],
+        'pianoChannel': ['piano', 'channel'],
         
         // Audio settings
         'audioEnabled': ['audio', 'enabled'],
-        'sampleRate': ['audio', 'sample_rate'],
-        'bufferSize': ['audio', 'buffer_size'],
-        'inputDevice': ['audio', 'input_device'],
+        'audioVolume': ['audio', 'volume'],
+        'audioInputDevice': ['audio', 'inputDevice'],
+        'audioGain': ['audio', 'gain'],
         
         // GPIO settings
-        'gpioPin': ['gpio', 'led_pin'],
-        'gpioFreq': ['gpio', 'frequency'],
+        'gpioPins': ['gpio', 'pins'],
+        'gpioDebounce': ['gpio', 'debounce_time'],
         'gpioDma': ['gpio', 'dma_channel'],
         
         // Hardware settings
@@ -99,6 +95,91 @@ function migrateSettingsStructure(settings) {
     return migratedSettings;
 }
 
+/**
+ * Consolidate settings from multiple localStorage keys into unified structure
+ */
+function consolidateStorageData() {
+    if (!browser) return {};
+    
+    const consolidatedSettings = {};
+    
+    try {
+        // Load main settings
+        const mainSettings = localStorage.getItem('piano-led-settings');
+        if (mainSettings) {
+            const parsed = JSON.parse(mainSettings);
+            Object.assign(consolidatedSettings, parsed);
+        }
+        
+        // Load preferences
+        const preferences = localStorage.getItem('midi-visualizer-preferences');
+        if (preferences) {
+            const parsed = JSON.parse(preferences);
+            
+            // Map preferences to new structure
+            if (parsed.upload) consolidatedSettings.upload = parsed.upload;
+            if (parsed.ui) consolidatedSettings.ui = parsed.ui;
+            if (parsed.a11y) consolidatedSettings.a11y = parsed.a11y;
+            if (parsed.help) consolidatedSettings.help = parsed.help;
+            if (parsed.history) consolidatedSettings.history = parsed.history;
+        }
+        
+        // Load help preferences
+        const helpPrefs = localStorage.getItem('help-preferences');
+        if (helpPrefs) {
+            const parsed = JSON.parse(helpPrefs);
+            if (!consolidatedSettings.help) consolidatedSettings.help = {};
+            Object.assign(consolidatedSettings.help, parsed);
+        }
+        
+        // Load tour completion state
+        const tourCompleted = localStorage.getItem('tour-completed');
+        if (tourCompleted === 'true') {
+            if (!consolidatedSettings.help) consolidatedSettings.help = {};
+            consolidatedSettings.help.tourCompleted = true;
+        }
+        
+        // Load last uploaded file
+        const lastFile = localStorage.getItem('lastUploadedFile');
+        if (lastFile) {
+            if (!consolidatedSettings.upload) consolidatedSettings.upload = {};
+            consolidatedSettings.upload.lastUploadedFile = lastFile;
+        }
+        
+        console.log('Consolidated settings from multiple localStorage keys:', consolidatedSettings);
+        return consolidatedSettings;
+        
+    } catch (error) {
+        console.error('Error consolidating storage data:', error);
+        return {};
+    }
+}
+
+/**
+ * Clean up old localStorage keys after successful consolidation
+ */
+function cleanupOldStorageKeys() {
+    if (!browser) return;
+    
+    try {
+        const keysToRemove = [
+            'midi-visualizer-preferences',
+            'help-preferences', 
+            'tour-completed',
+            'lastUploadedFile'
+        ];
+        
+        keysToRemove.forEach(key => {
+            if (localStorage.getItem(key)) {
+                localStorage.removeItem(key);
+                console.log(`Cleaned up old localStorage key: ${key}`);
+            }
+        });
+    } catch (error) {
+        console.error('Error cleaning up old storage keys:', error);
+    }
+}
+
 // Enhanced settings store with persistence
 /**
  * Merge settings with defaults to ensure all required fields are present
@@ -130,26 +211,36 @@ function mergeWithDefaults(settings, defaults) {
 }
 
 export const settings = writable({}, (set) => {
-    // Load settings from localStorage on initialization
+    // Load and consolidate settings from multiple sources on initialization
     if (browser) {
         try {
-            const stored = localStorage.getItem('piano-led-settings');
-            if (stored) {
-                const parsedSettings = JSON.parse(stored);
-                console.log('Loaded settings from localStorage:', parsedSettings);
-                
-                // Migrate settings structure if needed
-                const migratedSettings = migrateSettingsStructure(parsedSettings);
-                set(migratedSettings);
-                
-                // Save migrated settings back to localStorage if structure changed
-                if (migratedSettings !== parsedSettings) {
-                    localStorage.setItem('piano-led-settings', JSON.stringify(migratedSettings));
-                    console.log('Migrated and saved settings structure');
-                }
+            // First, consolidate data from multiple localStorage keys
+            const consolidatedData = consolidateStorageData();
+            
+            // Then migrate the structure if needed
+            const migratedSettings = migrateSettingsStructure(consolidatedData);
+            
+            // Merge with defaults to ensure completeness
+            const defaults = getAllDefaults();
+            const finalSettings = mergeWithDefaults(migratedSettings, defaults);
+            
+            console.log('Initialized settings with consolidated and migrated data:', finalSettings);
+            set(finalSettings);
+            
+            // Save the consolidated settings to the main key
+            localStorage.setItem('piano-led-settings', JSON.stringify(finalSettings));
+            
+            // Clean up old localStorage keys after successful consolidation
+            if (Object.keys(consolidatedData).length > 0) {
+                cleanupOldStorageKeys();
+                console.log('Cleaned up fragmented localStorage keys');
             }
+            
         } catch (error) {
-            console.error('Failed to load settings from localStorage:', error);
+            console.error('Failed to load and consolidate settings:', error);
+            // Fallback to defaults if consolidation fails
+            const defaults = getAllDefaults();
+            set(defaults);
         }
     }
     

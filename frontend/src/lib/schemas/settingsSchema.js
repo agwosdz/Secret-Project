@@ -136,6 +136,59 @@ export const settingsSchema = {
                 }
             }
         }
+    },
+    
+    upload: {
+        type: 'object',
+        properties: {
+            autoUpload: { type: 'boolean', default: false },
+            rememberLastDirectory: { type: 'boolean', default: true },
+            showFilePreview: { type: 'boolean', default: true },
+            confirmBeforeReset: { type: 'boolean', default: true },
+            enableValidationPreview: { type: 'boolean', default: true },
+            lastUploadedFile: { type: 'string', default: '' }
+        }
+    },
+    
+    ui: {
+        type: 'object',
+        properties: {
+            theme: { type: 'string', enum: ['light', 'dark', 'auto'], default: 'auto' },
+            reducedMotion: { type: 'boolean', default: false },
+            showTooltips: { type: 'boolean', default: true },
+            tooltipDelay: { type: 'number', minimum: 0, maximum: 2000, default: 300 },
+            animationSpeed: { type: 'string', enum: ['slow', 'normal', 'fast'], default: 'normal' }
+        }
+    },
+    
+    a11y: {
+        type: 'object',
+        properties: {
+            highContrast: { type: 'boolean', default: false },
+            largeText: { type: 'boolean', default: false },
+            keyboardNavigation: { type: 'boolean', default: true },
+            screenReaderOptimized: { type: 'boolean', default: false }
+        }
+    },
+    
+    help: {
+        type: 'object',
+        properties: {
+            showOnboarding: { type: 'boolean', default: true },
+            showHints: { type: 'boolean', default: true },
+            completedTours: { type: 'array', items: { type: 'string' }, default: [] },
+            skippedTours: { type: 'array', items: { type: 'string' }, default: [] },
+            tourCompleted: { type: 'boolean', default: false }
+        }
+    },
+    
+    history: {
+        type: 'object',
+        properties: {
+            maxHistorySize: { type: 'number', minimum: 10, maximum: 200, default: 50 },
+            autosaveInterval: { type: 'number', minimum: 5000, maximum: 300000, default: 30000 },
+            persistHistory: { type: 'boolean', default: true }
+        }
     }
 };
 

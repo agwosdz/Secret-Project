@@ -429,54 +429,7 @@ from api.hardware_test import hardware_test_bp
 app.register_blueprint(settings_bp, url_prefix='/api/settings')
 app.register_blueprint(hardware_test_bp)
 
-@app.route('/api/test-hardware', methods=['POST'])
-def test_hardware():
-    """Test hardware configuration"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({
-                'success': False,
-                'message': 'No configuration data provided'
-            }), 400
-        
-        # Validate GPIO pin availability
-        gpio_pin = data.get('gpio_pin', 18)
-        try:
-            from config import validate_gpio_pin_availability
-            if not validate_gpio_pin_availability(gpio_pin):
-                return jsonify({
-                    'success': False,
-                    'message': f'GPIO pin {gpio_pin} is not available or already in use'
-                }), 200
-        except Exception as e:
-            logger.warning(f"GPIO validation failed: {e}")
-        
-        # Test LED controller initialization
-        if LEDController:
-            try:
-                test_controller = LEDController(
-                    led_count=data.get('led_count', 246),
-                    gpio_pin=gpio_pin,
-                    freq_hz=data.get('led_frequency', 800000),
-                    dma=data.get('led_dma', 10),
-                    channel=data.get('led_channel', 0),
-                    invert=data.get('led_invert', False),
-                    brightness=int(data.get('brightness', 0.5) * 255)
-                )
-                
-                # Test basic LED functionality
-                test_controller.clear()
-                test_controller.set_pixel(0, (255, 0, 0))  # Red test
-                test_controller.show()
-                time.sleep(0.1)
-                test_controller.clear()
-                test_controller.show()
-                
-                return jsonify({
-                    'success': True,
-                    'message': 'Hardware test passed successfully'
-                }), 200
+# Hardware test endpoint moved to /api/hardware-test blueprint for better organization
                 
             except Exception as e:
                 return jsonify({

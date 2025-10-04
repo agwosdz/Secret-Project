@@ -175,6 +175,38 @@ class SettingsService:
                 'recentConfigs': {'type': 'array', 'default': []},
                 'lastUsedDevice': {'type': 'string', 'default': ''},
                 'navigationCollapsed': {'type': 'boolean', 'default': False}
+            },
+            'upload': {
+                'autoUpload': {'type': 'boolean', 'default': False},
+                'rememberLastDirectory': {'type': 'boolean', 'default': True},
+                'showFilePreview': {'type': 'boolean', 'default': True},
+                'confirmBeforeReset': {'type': 'boolean', 'default': True},
+                'lastUploadedFile': {'type': 'string', 'default': ''}
+            },
+            'ui': {
+                'theme': {'type': 'string', 'default': 'auto', 'enum': ['light', 'dark', 'auto']},
+                'reducedMotion': {'type': 'boolean', 'default': False},
+                'showTooltips': {'type': 'boolean', 'default': True},
+                'tooltipDelay': {'type': 'number', 'default': 300, 'min': 0, 'max': 2000},
+                'animationSpeed': {'type': 'string', 'default': 'normal', 'enum': ['slow', 'normal', 'fast']}
+            },
+            'a11y': {
+                'highContrast': {'type': 'boolean', 'default': False},
+                'largeText': {'type': 'boolean', 'default': False},
+                'keyboardNavigation': {'type': 'boolean', 'default': True},
+                'screenReaderOptimized': {'type': 'boolean', 'default': False}
+            },
+            'help': {
+                'showOnboarding': {'type': 'boolean', 'default': True},
+                'showHints': {'type': 'boolean', 'default': True},
+                'completedTours': {'type': 'array', 'default': []},
+                'skippedTours': {'type': 'array', 'default': []},
+                'tourCompleted': {'type': 'boolean', 'default': False}
+            },
+            'history': {
+                'maxHistorySize': {'type': 'number', 'default': 50, 'min': 10, 'max': 200},
+                'autosaveInterval': {'type': 'number', 'default': 30000, 'min': 5000, 'max': 300000},
+                'persistHistory': {'type': 'boolean', 'default': True}
             }
         }
     

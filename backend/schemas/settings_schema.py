@@ -54,30 +54,42 @@ class SettingsSchema:
             'type': 'object',
             'required': ['enabled', 'led_count', 'brightness'],
             'properties': {
+                # Core LED settings
                 'enabled': {'type': 'boolean'},
                 'led_count': {'type': 'number', 'minimum': 1, 'maximum': 1000},
                 'max_led_count': {'type': 'number', 'minimum': 1, 'maximum': 1000},
                 'brightness': {'type': 'number', 'minimum': 0, 'maximum': 100},
+                
+                # LED hardware configuration
                 'led_type': {'type': 'string', 'enum': ['WS2812B', 'WS2813', 'WS2815', 'APA102', 'SK6812']},
-                'led_orientation': {'type': 'string', 'enum': ['normal', 'reversed']},
                 'led_strip_type': {'type': 'string', 'enum': ['WS2811_STRIP_GRB', 'WS2811_STRIP_RGB', 'WS2811_STRIP_BRG', 'WS2811_STRIP_BGR']},
-                'power_supply_voltage': {'type': 'number', 'minimum': 3.0, 'maximum': 24.0},
-                'power_supply_current': {'type': 'number', 'minimum': 0.1, 'maximum': 100.0},
-                'color_profile': {'type': 'string', 'enum': ['Standard RGB', 'sRGB', 'Adobe RGB', 'Wide Gamut']},
-                'performance_mode': {'type': 'string', 'enum': ['Power Saving', 'Balanced', 'Performance', 'Maximum']},
-                'gamma_correction': {'type': 'number', 'minimum': 1.0, 'maximum': 3.0},
-                'white_balance': {'type': 'object', 'properties': {'r': {'type': 'number'}, 'g': {'type': 'number'}, 'b': {'type': 'number'}}},
-                'color_temperature': {'type': 'number', 'minimum': 2000, 'maximum': 10000},
-                'dither_enabled': {'type': 'boolean'},
-                'update_rate': {'type': 'number', 'minimum': 1, 'maximum': 120},
-                'power_limiting_enabled': {'type': 'boolean'},
-                'max_power_watts': {'type': 'number', 'minimum': 1, 'maximum': 1000},
-                'thermal_protection_enabled': {'type': 'boolean'},
-                'max_temperature_celsius': {'type': 'number', 'minimum': 40, 'maximum': 100},
+                'led_orientation': {'type': 'string', 'enum': ['normal', 'reversed']},
                 'data_pin': {'type': 'number', 'minimum': 1, 'maximum': 40},
                 'clock_pin': {'type': 'number', 'minimum': 1, 'maximum': 40},
+                'gpioPin': {'type': 'number', 'minimum': 1, 'maximum': 40},  # Frontend compatibility
                 'reverse_order': {'type': 'boolean'},
-                'color_mode': {'type': 'string', 'enum': ['rainbow', 'velocity', 'note', 'custom']}
+                
+                # Color and visual settings
+                'color_mode': {'type': 'string', 'enum': ['rainbow', 'velocity', 'note', 'custom']},
+                'colorScheme': {'type': 'string'},  # Frontend compatibility
+                'color_profile': {'type': 'string', 'enum': ['Standard RGB', 'sRGB', 'Adobe RGB', 'Wide Gamut']},
+                'color_temperature': {'type': 'number', 'minimum': 2000, 'maximum': 10000},
+                'gamma_correction': {'type': 'number', 'minimum': 1.0, 'maximum': 3.0},
+                'white_balance': {'type': 'object', 'properties': {'r': {'type': 'number'}, 'g': {'type': 'number'}, 'b': {'type': 'number'}}},
+                
+                # Performance and power settings
+                'performance_mode': {'type': 'string', 'enum': ['Power Saving', 'Balanced', 'Performance', 'Maximum']},
+                'power_supply_voltage': {'type': 'number', 'minimum': 3.0, 'maximum': 24.0},
+                'power_supply_current': {'type': 'number', 'minimum': 0.1, 'maximum': 100.0},
+                'power_limiting_enabled': {'type': 'boolean'},
+                'max_power_watts': {'type': 'number', 'minimum': 1, 'maximum': 1000},
+                
+                # Advanced settings
+                'dither_enabled': {'type': 'boolean'},
+                'update_rate': {'type': 'number', 'minimum': 1, 'maximum': 120},
+                'thermal_protection_enabled': {'type': 'boolean'},
+                'max_temperature_celsius': {'type': 'number', 'minimum': 40, 'maximum': 100},
+                'animationSpeed': {'type': 'number', 'minimum': 0.1, 'maximum': 5.0}  # Frontend compatibility
             }
         },
         
