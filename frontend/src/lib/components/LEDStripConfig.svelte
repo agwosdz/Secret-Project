@@ -230,8 +230,8 @@
 			errors.ledCount = `LED count cannot exceed ${settings.maxLedCount}`;
 		}
 		
-		if (settings.brightness < 0 || settings.brightness > 1) {
-			errors.brightness = 'Brightness must be between 0 and 1';
+		if (settings.brightness < 0 || settings.brightness > 100) {
+			errors.brightness = 'Brightness must be between 0 and 100';
 		}
 		
 		if (settings.powerSupplyVoltage < 3 || settings.powerSupplyVoltage > 24) {
@@ -333,11 +333,11 @@
 			id="led-count"
 			bind:value={settings.ledCount}
 			min="1"
-			max="1000"
+			max={settings.maxLedCount}
 			{disabled}
 			validationState={$categoryValidation.errors?.count ? 'invalid' : 'valid'}
 			error={$categoryValidation.errors?.count}
-			helpText="Number of LEDs in your strip (1-1000)"
+			helpText="Number of LEDs in your strip (1-{settings.maxLedCount})"
 			on:change={(e) => handleConfigChange('ledCount', e.detail)}
 		/>
 	</div>

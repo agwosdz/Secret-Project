@@ -133,7 +133,7 @@ function handleLEDSettingsChange(newLEDSettings) {
 			led_strip_type: newLEDSettings.ledStripType,
 			power_supply_voltage: newLEDSettings.powerSupplyVoltage,
 			power_supply_current: newLEDSettings.powerSupplyCurrent,
-			brightness: newLEDSettings.brightness,
+			brightness: newLEDSettings.brightness / 100, // Convert from 0-100 to 0-1 for backend
 			color_profile: newLEDSettings.colorProfile,
 			performance_mode: newLEDSettings.performanceMode,
 			gamma_correction: newLEDSettings.advancedSettings?.gamma,
@@ -275,7 +275,7 @@ function showMessage(text, type) {
 						ledStripType: currentSettings.led?.led_strip_type || currentSettings.led_strip_type || 'WS2811_STRIP_GRB',
 						powerSupplyVoltage: currentSettings.led?.power_supply_voltage || currentSettings.power_supply_voltage || 5.0,
 						powerSupplyCurrent: currentSettings.led?.power_supply_current || currentSettings.power_supply_current || 10.0,
-						brightness: currentSettings.led?.brightness || currentSettings.brightness || 0.5,
+						brightness: (currentSettings.led?.brightness || currentSettings.brightness || 0.5) * 100, // Convert from 0-1 to 0-100 for frontend
 						colorProfile: currentSettings.led?.color_profile || currentSettings.color_profile || 'standard',
 						performanceMode: currentSettings.led?.performance_mode || currentSettings.performance_mode || 'balanced',
 						advancedSettings: {
