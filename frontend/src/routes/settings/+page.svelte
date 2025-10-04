@@ -268,10 +268,10 @@ function showMessage(text, type) {
 				>
 				<LEDStripConfig 
 					settings={{
-						ledCount: currentSettings.led?.led_count || currentSettings.led_count || 246,
+						ledCount: currentSettings.led?.ledCount || currentSettings.led?.led_count || currentSettings.led?.count || currentSettings.led_count || 246,
 						maxLedCount: currentSettings.led?.max_led_count || currentSettings.max_led_count || 300,
-						ledType: currentSettings.led?.led_type || currentSettings.led_type || 'WS2812B',
-						ledOrientation: currentSettings.led?.led_orientation || currentSettings.led_orientation || 'normal',
+						ledType: currentSettings.led?.ledType || currentSettings.led?.led_type || currentSettings.led_type || 'WS2812B',
+						ledOrientation: currentSettings.led?.ledOrientation || currentSettings.led?.led_orientation || currentSettings.led_orientation || 'normal',
 						ledStripType: currentSettings.led?.led_strip_type || currentSettings.led_strip_type || 'WS2811_STRIP_GRB',
 						powerSupplyVoltage: currentSettings.led?.power_supply_voltage || currentSettings.power_supply_voltage || 5.0,
 						powerSupplyCurrent: currentSettings.led?.power_supply_current || currentSettings.power_supply_current || 10.0,
@@ -279,7 +279,7 @@ function showMessage(text, type) {
 						colorProfile: currentSettings.led?.color_profile || currentSettings.color_profile || 'standard',
 						performanceMode: currentSettings.led?.performance_mode || currentSettings.performance_mode || 'balanced',
 						advancedSettings: {
-							gamma: currentSettings.led?.gamma_correction || currentSettings.gamma_correction || 2.2,
+							gamma: currentSettings.led?.gammaCorrection || currentSettings.led?.gamma_correction || currentSettings.gamma_correction || 2.2,
 							whiteBalance: currentSettings.led?.white_balance || currentSettings.white_balance || { r: 1.0, g: 1.0, b: 1.0 },
 							colorTemp: currentSettings.led?.color_temperature || currentSettings.color_temperature || 6500,
 							dither: currentSettings.led?.dither_enabled || currentSettings.dither_enabled || true,
