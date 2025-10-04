@@ -677,8 +677,10 @@
 	/* Help Section */
 	.help-section {
 		margin-top: 16px;
-		padding-top: 12px;
-		border-top: 1px solid rgba(0, 0, 0, 0.1);
+		padding: 12px;
+		background-color: rgba(0, 102, 204, 0.05);
+		border: 1px solid rgba(0, 102, 204, 0.2);
+		border-radius: 6px;
 	}
 
 	.help-section h5 {
@@ -756,24 +758,6 @@
 		border-radius: 8px;
 		font-size: 14px;
 		line-height: 1.4;
-	}
-
-	.help-section {
-		margin-top: 16px;
-	}
-
-	.help-section .section-header {
-		background-color: rgba(0, 102, 204, 0.05);
-		border-color: rgba(0, 102, 204, 0.2);
-	}
-
-	.help-section .section-header:hover {
-		background-color: rgba(0, 102, 204, 0.1);
-	}
-
-	.help-section .section-content {
-		background-color: rgba(0, 102, 204, 0.02);
-		border-left: 2px solid rgba(0, 102, 204, 0.2);
 	}
 
 	.help-links {

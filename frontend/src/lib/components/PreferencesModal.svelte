@@ -128,13 +128,6 @@
 		};
 		reader.readAsText(file);
 	}
-				}
-			} catch (error) {
-				alert('Invalid preferences file.');
-			}
-		};
-		reader.readAsText(file);
-	}
 </script>
 
 <div class="modal-backdrop" on:click={handleCancel}>
