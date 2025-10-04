@@ -120,27 +120,32 @@ function handleSettingsChange(newSettings) {
 
 function handleLEDSettingsChange(newLEDSettings) {
 	// Map the enhanced LED settings back to the backend format
+	// Group all LED settings under the 'led' category as expected by the backend schema
 	const updatedSettings = {
 		...currentSettings,
-		led_count: newLEDSettings.ledCount,
-		max_led_count: newLEDSettings.maxLedCount,
-		led_type: newLEDSettings.ledType,
-		led_orientation: newLEDSettings.ledOrientation,
-		led_strip_type: newLEDSettings.ledStripType,
-		power_supply_voltage: newLEDSettings.powerSupplyVoltage,
-		power_supply_current: newLEDSettings.powerSupplyCurrent,
-		brightness: newLEDSettings.brightness,
-		color_profile: newLEDSettings.colorProfile,
-		performance_mode: newLEDSettings.performanceMode,
-		gamma_correction: newLEDSettings.advancedSettings?.gamma,
-		white_balance: newLEDSettings.advancedSettings?.whiteBalance,
-		color_temperature: newLEDSettings.advancedSettings?.colorTemp,
-		dither_enabled: newLEDSettings.advancedSettings?.dither,
-		update_rate: newLEDSettings.advancedSettings?.updateRate,
-		power_limiting_enabled: newLEDSettings.advancedSettings?.powerLimiting,
-		max_power_watts: newLEDSettings.advancedSettings?.maxPower,
-		thermal_protection_enabled: newLEDSettings.advancedSettings?.thermalProtection,
-		max_temperature_celsius: newLEDSettings.advancedSettings?.maxTemperature
+		led: {
+			...currentSettings.led,
+			enabled: currentSettings.led?.enabled ?? true,
+			led_count: newLEDSettings.ledCount,
+			max_led_count: newLEDSettings.maxLedCount,
+			led_type: newLEDSettings.ledType,
+			led_orientation: newLEDSettings.ledOrientation,
+			led_strip_type: newLEDSettings.ledStripType,
+			power_supply_voltage: newLEDSettings.powerSupplyVoltage,
+			power_supply_current: newLEDSettings.powerSupplyCurrent,
+			brightness: newLEDSettings.brightness,
+			color_profile: newLEDSettings.colorProfile,
+			performance_mode: newLEDSettings.performanceMode,
+			gamma_correction: newLEDSettings.advancedSettings?.gamma,
+			white_balance: newLEDSettings.advancedSettings?.whiteBalance,
+			color_temperature: newLEDSettings.advancedSettings?.colorTemp,
+			dither_enabled: newLEDSettings.advancedSettings?.dither,
+			update_rate: newLEDSettings.advancedSettings?.updateRate,
+			power_limiting_enabled: newLEDSettings.advancedSettings?.powerLimiting,
+			max_power_watts: newLEDSettings.advancedSettings?.maxPower,
+			thermal_protection_enabled: newLEDSettings.advancedSettings?.thermalProtection,
+			max_temperature_celsius: newLEDSettings.advancedSettings?.maxTemperature
+		}
 	};
 	updateSettings(updatedSettings);
 }
@@ -263,26 +268,26 @@ function showMessage(text, type) {
 				>
 				<LEDStripConfig 
 					settings={{
-						ledCount: currentSettings.led_count || 246,
-						maxLedCount: currentSettings.max_led_count || 300,
-						ledType: currentSettings.led_type || 'WS2812B',
-						ledOrientation: currentSettings.led_orientation || 'normal',
-						ledStripType: currentSettings.led_strip_type || 'WS2811_STRIP_GRB',
-						powerSupplyVoltage: currentSettings.power_supply_voltage || 5.0,
-						powerSupplyCurrent: currentSettings.power_supply_current || 10.0,
-						brightness: currentSettings.brightness || 0.5,
-						colorProfile: currentSettings.color_profile || 'standard',
-						performanceMode: currentSettings.performance_mode || 'balanced',
+						ledCount: currentSettings.led?.led_count || currentSettings.led_count || 246,
+						maxLedCount: currentSettings.led?.max_led_count || currentSettings.max_led_count || 300,
+						ledType: currentSettings.led?.led_type || currentSettings.led_type || 'WS2812B',
+						ledOrientation: currentSettings.led?.led_orientation || currentSettings.led_orientation || 'normal',
+						ledStripType: currentSettings.led?.led_strip_type || currentSettings.led_strip_type || 'WS2811_STRIP_GRB',
+						powerSupplyVoltage: currentSettings.led?.power_supply_voltage || currentSettings.power_supply_voltage || 5.0,
+						powerSupplyCurrent: currentSettings.led?.power_supply_current || currentSettings.power_supply_current || 10.0,
+						brightness: currentSettings.led?.brightness || currentSettings.brightness || 0.5,
+						colorProfile: currentSettings.led?.color_profile || currentSettings.color_profile || 'standard',
+						performanceMode: currentSettings.led?.performance_mode || currentSettings.performance_mode || 'balanced',
 						advancedSettings: {
-							gamma: currentSettings.gamma_correction || 2.2,
-							whiteBalance: currentSettings.white_balance || { r: 1.0, g: 1.0, b: 1.0 },
-							colorTemp: currentSettings.color_temperature || 6500,
-							dither: currentSettings.dither_enabled || true,
-							updateRate: currentSettings.update_rate || 60,
-							powerLimiting: currentSettings.power_limiting_enabled || false,
-							maxPower: currentSettings.max_power_watts || 100,
-							thermalProtection: currentSettings.thermal_protection_enabled || true,
-							maxTemperature: currentSettings.max_temperature_celsius || 85
+							gamma: currentSettings.led?.gamma_correction || currentSettings.gamma_correction || 2.2,
+							whiteBalance: currentSettings.led?.white_balance || currentSettings.white_balance || { r: 1.0, g: 1.0, b: 1.0 },
+							colorTemp: currentSettings.led?.color_temperature || currentSettings.color_temperature || 6500,
+							dither: currentSettings.led?.dither_enabled || currentSettings.dither_enabled || true,
+							updateRate: currentSettings.led?.update_rate || currentSettings.update_rate || 60,
+							powerLimiting: currentSettings.led?.power_limiting_enabled || currentSettings.power_limiting_enabled || false,
+							maxPower: currentSettings.led?.max_power_watts || currentSettings.max_power_watts || 100,
+							thermalProtection: currentSettings.led?.thermal_protection_enabled || currentSettings.thermal_protection_enabled || true,
+							maxTemperature: currentSettings.led?.max_temperature_celsius || currentSettings.max_temperature_celsius || 85
 						}
 					}}
 					on:configChange={(e) => handleLEDSettingsChange(e.detail)}
