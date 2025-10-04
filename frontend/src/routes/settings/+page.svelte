@@ -126,8 +126,8 @@ function handleLEDSettingsChange(newLEDSettings) {
 		led: {
 			...currentSettings.led,
 			enabled: currentSettings.led?.enabled ?? true,
-			led_count: newLEDSettings.ledCount,
-			max_led_count: newLEDSettings.maxLedCount,
+			led_count: parseInt(newLEDSettings.ledCount) || 246,
+			max_led_count: parseInt(newLEDSettings.maxLedCount) || 300,
 			led_type: newLEDSettings.ledType,
 			led_orientation: newLEDSettings.ledOrientation,
 			led_strip_type: newLEDSettings.ledStripType,
@@ -268,8 +268,8 @@ function showMessage(text, type) {
 				>
 				<LEDStripConfig 
 					settings={{
-						ledCount: currentSettings.led?.ledCount || currentSettings.led?.led_count || currentSettings.led?.count || currentSettings.led_count || 246,
-						maxLedCount: currentSettings.led?.max_led_count || currentSettings.max_led_count || 300,
+						ledCount: parseInt(currentSettings.led?.ledCount || currentSettings.led?.led_count || currentSettings.led?.count || currentSettings.led_count) || 246,
+						maxLedCount: parseInt(currentSettings.led?.max_led_count || currentSettings.max_led_count) || 300,
 						ledType: currentSettings.led?.ledType || currentSettings.led?.led_type || currentSettings.led_type || 'WS2812B',
 						ledOrientation: currentSettings.led?.ledOrientation || currentSettings.led?.led_orientation || currentSettings.led_orientation || 'normal',
 						ledStripType: currentSettings.led?.led_strip_type || currentSettings.led_strip_type || 'WS2811_STRIP_GRB',
