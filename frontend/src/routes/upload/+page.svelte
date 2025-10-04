@@ -131,7 +131,7 @@ import { onMount } from 'svelte';
 	} | null = null;
 
 	// Handle file selection (both click and drag-drop)
-	function handleFileSelect(event: Event) {
+	async function handleFileSelect(event: Event) {
 		const target = event.target as HTMLInputElement;
 		const file = target.files?.[0];
 
@@ -150,10 +150,10 @@ import { onMount } from 'svelte';
 		}
 
 		// Direct processing if preview is disabled
-		processFileSelection(file);
+		await processFileSelection(file);
 	}
 
-	function processFileSelection(file: File) {
+	async function processFileSelection(file: File) {
 		// Validate file type
 		if (!file.name.toLowerCase().match(/\.(mid|midi)$/)) {
 			uploadMessage = 'Only .mid and .midi files are supported';
@@ -177,7 +177,7 @@ import { onMount } from 'svelte';
 			settingsAPI.setSetting('upload', 'lastDirectory', file.webkitRelativePath);
 		}
 
-		processSelectedFile(file);
+		await processSelectedFile(file);
 		
 		// Save state after file selection
 		if (file) {
@@ -193,7 +193,7 @@ import { onMount } from 'svelte';
 
 
 	// Process a selected file (common logic for click and drag-drop)
-	function processSelectedFile(file: File) {
+	async function processSelectedFile(file: File) {
 		// Start processing status
 		const processingId = statusUtils.processingStart(file.name, 'Validating MIDI file...');
 		
@@ -363,7 +363,7 @@ import { onMount } from 'svelte';
 		uploadMessage = '';
 		uploadStatus = 'idle';
 		
-		processSelectedFile(file);
+		await processSelectedFile(file);
 		
 		// Save state after drag and drop
 		if (file) {
@@ -611,7 +611,7 @@ import { onMount } from 'svelte';
 	});
 
 	// Validation preview event handlers
-	function handleValidationProceed(event: CustomEvent<{ files: File[] }>) {
+	async function handleValidationProceed(event: CustomEvent<{ files: File[] }>) {
 		const files = event.detail.files;
 		if (files.length > 0) {
 			const file = files[0];
@@ -629,7 +629,7 @@ import { onMount } from 'svelte';
 				}
 			});
 			
-			processFileSelection(file);
+			await processFileSelection(file);
 		}
 		resetValidationPreview();
 	}
