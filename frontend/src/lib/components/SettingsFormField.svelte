@@ -25,13 +25,35 @@
 	}
 	
 	function handleInput(event) {
-		value = event.target.value;
-		dispatch('input', { value, id });
+		let newValue = event.target.value;
+		
+		// Convert to appropriate type for number inputs
+		if (type === 'number' || type === 'range') {
+			newValue = parseFloat(newValue);
+			// Handle NaN case
+			if (isNaN(newValue)) {
+				newValue = 0;
+			}
+		}
+		
+		value = newValue;
+		dispatch('input', { value: newValue, id });
 	}
 	
 	function handleChange(event) {
-		value = event.target.value;
-		dispatch('change', { value, id });
+		let newValue = event.target.value;
+		
+		// Convert to appropriate type for number inputs
+		if (type === 'number' || type === 'range') {
+			newValue = parseFloat(newValue);
+			// Handle NaN case
+			if (isNaN(newValue)) {
+				newValue = 0;
+			}
+		}
+		
+		value = newValue;
+		dispatch('change', { value: newValue, id });
 	}
 	
 	$: hasError = error && error.length > 0;
